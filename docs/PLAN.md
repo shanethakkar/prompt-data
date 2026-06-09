@@ -15,7 +15,7 @@ comes next. Full spec: docs/SPEC.md.
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
-| 3 | Eval harness | Not started |
+| 3 | Eval harness | **In progress** |
 | 4 | Frontend core | Not started |
 | 5 | Showcase pages | Not started |
 | 6 | Production and polish | Not started |
@@ -338,13 +338,63 @@ confidence not a measured metric (provisional label, no claims until Phase 3).
 
 ---
 
-## Phase 3 — Eval harness *(expand before starting)*
+## Phase 3 — Eval harness
 
-Deliverables: BIRD runner, all metrics (exec accuracy, semantic-error rate, calibration,
-clarification precision/recall, cost/latency), trust-layer ablation, fitted calibration map,
-JSON output. Done within the 4 GB memory budget.
+**Done when:** one command produces a committed `eval/out/eval_results.json` (+ `calibration.json`)
+on a pinned subset within budget, numbers are reproducible, offline gates green, and the fitted
+calibration map is picked up by the server (`confidence.calibrated == True`).
 
-*Expand this section at the start of Phase 3.*
+**Gate results:** *(fill in at end of phase)*
+- [ ] `uv run python eval/prep_bird.py` — unzip + subset built
+- [ ] `uv run python eval/run_bird.py --dry-run --limit 3` — plumbing, no API
+- [ ] `uv run ruff check backend/ data/ eval/` — clean
+- [ ] `uv run mypy backend/ eval/` — clean (eval now type-checked)
+- [ ] `uv run pytest backend/tests/ -q` — all pass, idle RSS recorded
+- [ ] Paid Haiku run (~100 questions): exec acc ___, semantic-error ___, confidently-wrong
+      with/without trust ___ -> ___, ECE raw->calibrated ___, clarification P/R ___, cost ___, eval peak RSS ___
+
+### Decisions (locked)
+- Scope: pinned ~100-question BIRD subset stratified by db_id x difficulty (committed ids, seeded),
+  Haiku 4.5, K=3. I run the paid eval (~$2-3) and commit outputs. Numbers caveated as pinned-subset.
+- Retrieval deferred: full per-DB schema cards via `build_schema_card`; retrieval_score stays 1.0.
+- Calibration: pure-Python PAVA isotonic on a held-out train split; ECE/Brier on the test split
+  (raw vs calibrated); write `eval/out/calibration.json` (`{"type":"isotonic","x","y"}`); wire back.
+- Labeled ambiguity set: commit `eval/labeled_ambiguity.json` (trap + clear, tagged by dimension)
+  to measure clarification precision/recall and penalize over-asking; seeds the Phase 5 gallery.
+
+### Files to create
+```
+eval/prep_bird.py            # offline unzip + pinned stratified subset
+eval/bird_subset.json        # committed pinned question_ids
+eval/labeled_ambiguity.json  # committed trap + clear labels
+eval/run_bird.py             # offline batch: with-trust + without-trust, resumable
+eval/metrics.py              # pure metric fns (reuses confidence.canonicalize_rows)
+eval/calibrate.py            # PAVA isotonic fit -> calibration.json
+eval/ablation.py             # confidently-wrong with vs without trust
+backend/tests/test_metrics.py, test_calibrate.py, test_run_bird.py
+```
+
+### Files to modify
+```
+backend/app/llm.py   # AnthropicClient accumulates token usage (cost tracking); Protocol unchanged
+pyproject.toml       # remove eval/ from mypy exclude (type eval now)
+.gitignore           # un-ignore eval/out/eval_results.json + calibration.json (commit for reproducibility)
+```
+
+### Key designs
+- Runner composes pipeline building blocks directly (detect_ambiguity -> generate_with_self_correction
+  -> execute -> self_consistency -> compute_confidence) with a BIRD schema card and empty semantic
+  layer, so product `respond()` stays unchanged. BIRD `evidence` is folded into the question.
+- Gold SQL executes raw read-only (no validator re-emit) so backticks and >500-row results survive;
+  predicted goes through the product sandbox with a high eval row cap. Match via `canonicalize_rows`.
+- Confidently-wrong (with trust) = not-clarified + executed + wrong + score>=0.8; baseline = all
+  semantic errors. The reduction is the signature number.
+- Resumable: append records to `eval/out/results.partial.jsonl`, skip done ids on rerun; `--max-cost` abort.
+
+### Risks (see plan file for full table)
+Cost overrun (Haiku+K=3+~100, --max-cost, resumable, caching); small-N noise (caveat); sqlglot
+re-emit on predicted (faithful to product; gold raw); LIMIT truncation (high eval cap); temp>0
+non-determinism (temp-0 primary reproducible, committed JSON canonical); eval memory (one DB at a time).
 
 ---
 
