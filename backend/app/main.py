@@ -9,6 +9,7 @@ backend/tests/test_server_rss.py for the runtime enforcement of that constraint.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI
@@ -16,13 +17,14 @@ from pydantic import BaseModel
 
 from backend.app.config import Settings, get_settings
 from backend.app.llm import LLMClient, get_llm_client
-from backend.app.pipeline.answer import answer_question
+from backend.app.pipeline.answer import TrustedResponse, respond
 
 app = FastAPI(title="Verity", version="0.1.0")
 
 
 class AskRequest(BaseModel):
     question: str
+    clarification_answer: str | None = None
 
 
 @app.get("/health")
@@ -31,24 +33,25 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "version": "0.1.0"}
 
 
+def _serialize(result: TrustedResponse) -> dict[str, Any]:
+    payload = asdict(result)
+    # Rows are tuples; JSON wants lists.
+    if result.answer is not None:
+        payload["answer"]["rows"] = [list(row) for row in result.answer.rows]
+    return payload
+
+
 @app.post("/ask")
 async def ask(
     request: AskRequest,
     client: Annotated[LLMClient, Depends(get_llm_client)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict[str, Any]:
-    """Answer one question. Non-streaming JSON; streaming UI lands in Phase 4."""
-    result = answer_question(request.question, client=client, settings=settings)
-    return {
-        "question": result.question,
-        "explanation": result.explanation,
-        "sql": result.sql,
-        "columns": result.columns,
-        "rows": [list(row) for row in result.rows],
-        "row_count": result.row_count,
-        "chart_type": result.chart_type,
-        "self_correction_fired": result.self_correction_fired,
-        "attempts": result.attempts,
-        "timed_out": result.timed_out,
-        "error": result.error,
-    }
+    """Answer one question or return a clarifying question. Non-streaming; streaming is Phase 4."""
+    result = respond(
+        request.question,
+        client=client,
+        settings=settings,
+        clarification_answer=request.clarification_answer,
+    )
+    return _serialize(result)

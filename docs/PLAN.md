@@ -14,7 +14,7 @@ comes next. Full spec: docs/SPEC.md.
 |---|---|---|
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
-| 2 | Trust layer | **In progress** |
+| 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
 | 3 | Eval harness | Not started |
 | 4 | Frontend core | Not started |
 | 5 | Showcase pages | Not started |
@@ -275,11 +275,21 @@ cleanly in fixture teardown.
 question returns an answer plus a structured assumptions panel and a (provisional) confidence
 score, end-to-end via CLI and `/ask`, with offline gates green and a recorded live smoke.
 
-**Gate results:** *(fill in at end of phase)*
-- [ ] `uv run ruff check backend/ data/ eval/` — clean
-- [ ] `uv run mypy backend/` — clean (strict)
-- [ ] `uv run pytest backend/tests/ -q` — all pass, idle RSS recorded
-- [ ] Live smoke: clear -> answer+assumptions+confidence; ambiguous -> clarification; clarify follow-up
+**Gate results:** (2026-06-09, anthropic 0.107.1)
+- [x] `uv run ruff check backend/ data/ eval/` — clean
+- [x] `uv run mypy backend/` — clean (strict, 27 files)
+- [x] `uv run pytest backend/tests/ -q` — 72 passed, idle RSS still **5.6 MB**
+- [x] Live smoke (claude-sonnet-4-6, K=5):
+  - clear ("how many orders delivered") -> answer 96,478, assumptions (delivered + order count
+    terms, table, filter, limit), confidence 1.00 across 5 samples (provisional/uncalibrated)
+  - ambiguous ("top products last quarter") -> clarification flagging metric + time_window, 4 options
+  - clarify follow-up (`--clarify "by total revenue, calendar Q4 2018"`) -> proceeds, CTE query,
+    full assumptions surfaced, confidence 1.00 (0 rows: Olist data barely covers Q4 2018 -
+    correct query, honest empty result)
+
+**Findings (see docs/DECISIONS.md):** term-matching by columns/functions/literals is
+alias-independent; CLI now forces UTF-8 stdout; ambiguity prompt restricted to ASCII punctuation
+to honor the no-em-dash rule for user-facing clarifying copy.
 
 ### Decisions (locked)
 - Assumptions: deterministic from the executed SQL via sqlglot (tables, joins, filters, grain,

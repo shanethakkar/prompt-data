@@ -8,7 +8,7 @@ file in tmp_path; tests never touch the real (gitignored) demo.db.
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import TypeVar, cast
 
@@ -21,9 +21,15 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class FakeLLMClient:
-    """Deterministic LLMClient: pops a queued response per call, records inputs."""
+    """Deterministic LLMClient for tests.
 
-    def __init__(self, responses: list[BaseModel]) -> None:
+    Returns the next queued response whose type matches the requested
+    output_format (falling back to plain FIFO if none match). Type-matching lets
+    a test queue an AmbiguityReport plus several SqlGeneration responses without
+    caring about call order.
+    """
+
+    def __init__(self, responses: Sequence[BaseModel]) -> None:
         self._responses = list(responses)
         self.calls: list[dict[str, object]] = []
 
@@ -47,6 +53,9 @@ class FakeLLMClient:
         )
         if not self._responses:
             raise AssertionError("FakeLLMClient ran out of queued responses.")
+        for i, response in enumerate(self._responses):
+            if isinstance(response, output_format):
+                return cast(T, self._responses.pop(i))
         return cast(T, self._responses.pop(0))
 
 
@@ -94,4 +103,7 @@ def test_settings(fixture_db: str) -> Settings:
         sql_default_limit=500,
         sql_timeout_seconds=10.0,
         max_self_correction_attempts=2,
+        self_consistency_samples=3,
+        self_consistency_temperature=0.7,
+        calibration_path="eval/out/calibration.json",
     )

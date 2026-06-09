@@ -28,6 +28,39 @@ unable to find `pre-commit`).
 
 ---
 
+## [Phase 2] Assumption term-matching is alias-independent (columns/functions/literals)
+
+**Context:** The Assumptions panel must say which semantic-layer terms a query used, but the
+generated SQL aliases tables (`SUM(oi.price)`), so a literal substring match against the term's
+expression (`SUM(order_items.price)`) fails.
+
+**Decision:** match on the *signature* of each term, not its text: the set of column names
+(`exp.Column.name`, which is alias-independent), function names (`type(node).__name__.lower()`,
+not sqlglot's untyped `sql_name()`), and string literals it resolves to. A term matches when all
+three signature sets are subsets of the query's. This correctly matches `SUM(oi.price)` to revenue
+and avoids false `spend` matches (which also need `freight_value`). Structural assumptions
+(tables/joins/filters/grain/limit) are exact from the AST.
+
+**mypy note:** sqlglot's `Func.sql_name()` and `Expression.flatten()` are untyped (no-untyped-call
+under strict). Use `type(node).__name__.lower()` for function names and a small typed
+`_split_and` helper (recursing via `node.args`) instead of `flatten()`.
+
+---
+
+## [Phase 2] CLI forces UTF-8 stdout; clarifying copy restricted to ASCII
+
+**Context:** A live clarification rendered `Jan�Mar` on the Windows console: the model emitted an
+en-dash and the default cp1252 stdout could not encode it. Separately, the no-em-dash rule
+(CLAUDE.md) applies to user-facing copy, and clarifying questions/options are user-facing.
+
+**Decisions:**
+- `cli.py` calls `sys.stdout.reconfigure(encoding="utf-8")` at startup (guarded) so model/schema
+  text renders correctly regardless of the console code page.
+- The ambiguity system prompt now instructs plain ASCII punctuation (hyphens/commas/colons, no
+  em or en dashes) so generated clarifying copy complies with the plain-copy rule.
+
+---
+
 ## [Phase 1] anthropic SDK 0.107.1 structured-output shape — verified
 
 **Context:** Phase 1 generation uses structured outputs to avoid fragile parsing of SQL

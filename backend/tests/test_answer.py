@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from pydantic import BaseModel
+
 from backend.app.config import Settings, get_settings
 from backend.app.llm import get_llm_client
 from backend.app.main import app
+from backend.app.pipeline.ambiguity import AmbiguityReport
 from backend.app.pipeline.answer import answer_question, suggest_chart
 from backend.app.pipeline.generate import SqlGeneration
 from backend.tests.conftest import FakeLLMClient
@@ -71,24 +76,53 @@ def test_answer_question_reports_error_on_exhaustion(test_settings: Settings) ->
 
 
 # --------------------------------------------------------------------------- #
-# /ask endpoint                                                               #
+# /ask endpoint (TrustedResponse shape)                                       #
 # --------------------------------------------------------------------------- #
 
 
-def test_ask_endpoint(test_settings: Settings) -> None:
+def _post(
+    client: FakeLLMClient, test_settings: Settings, payload: dict[str, object]
+) -> dict[str, Any]:
     from fastapi.testclient import TestClient
 
-    client = FakeLLMClient([SqlGeneration(sql=_REVENUE_SQL, explanation="Revenue by category.")])
     app.dependency_overrides[get_llm_client] = lambda: client
     app.dependency_overrides[get_settings] = lambda: test_settings
     try:
-        resp = TestClient(app).post("/ask", json={"question": "revenue by category"})
+        resp = TestClient(app).post("/ask", json=payload)
     finally:
         app.dependency_overrides.clear()
-
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["chart_type"] == "bar"
-    assert body["row_count"] == 2
-    assert body["columns"] == ["product_category_name", "revenue"]
-    assert body["error"] is None
+    body: dict[str, Any] = resp.json()
+    return body
+
+
+def test_ask_endpoint_answer(test_settings: Settings) -> None:
+    responses: list[BaseModel] = [AmbiguityReport(needs_clarification=False)]
+    responses += [
+        SqlGeneration(sql=_REVENUE_SQL, explanation="Revenue by category.") for _ in range(3)
+    ]
+    body = _post(FakeLLMClient(responses), test_settings, {"question": "revenue by category"})
+
+    assert body["kind"] == "answer"
+    assert body["answer"]["chart_type"] == "bar"
+    assert body["answer"]["row_count"] == 2
+    assert body["answer"]["rows"][0] == ["toys", 50.0]  # rows are lists in JSON, highest first
+    assert body["assumptions"]["tables"] == ["order_items", "products"]
+    assert body["confidence"]["calibrated"] is False
+
+
+def test_ask_endpoint_clarification(test_settings: Settings) -> None:
+    client = FakeLLMClient(
+        [
+            AmbiguityReport(
+                needs_clarification=True,
+                dimensions=["time_window"],
+                clarifying_question="Which time window?",
+                options=["last 30 days", "all time"],
+            )
+        ]
+    )
+    body = _post(client, test_settings, {"question": "recent top products"})
+    assert body["kind"] == "clarification"
+    assert body["clarification"]["options"] == ["last 30 days", "all time"]
+    assert body["answer"] is None
