@@ -105,5 +105,7 @@ def test_settings(fixture_db: str) -> Settings:
         max_self_correction_attempts=2,
         self_consistency_samples=3,
         self_consistency_temperature=0.7,
-        calibration_path="eval/out/calibration.json",
+        # Point at a path that never exists so tests stay deterministic regardless of
+        # whether a real eval/out/calibration.json has been committed.
+        calibration_path="backend/tests/_no_such_calibration.json",
     )

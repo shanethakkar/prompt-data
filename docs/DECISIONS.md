@@ -61,6 +61,41 @@ en-dash and the default cp1252 stdout could not encode it. Separately, the no-em
 
 ---
 
+## [Phase 3] build_schema_card must quote table names (reserved words like `order`)
+
+**Context:** The paid BIRD run crashed in `build_schema_card` on a database with a table named
+`order`: `PRAGMA table_info(order)` is a syntax error. Olist has no reserved-word table names, so
+Phase 1 never hit it; the eval over 11 diverse BIRD schemas surfaced it.
+
+**Fix:** quote the table name in both PRAGMA calls — `PRAGMA table_info("{table}")` with embedded
+quotes doubled. Verified by building schema cards for all 11 BIRD DBs (613-6430 chars each, which
+also confirms the deferred-retrieval decision: the cards fit). The runner is resumable, so the 43
+records completed before the crash were preserved and the rerun finished the remaining 57.
+
+---
+
+## [Phase 3] Tests must not depend on the committed calibration artifact
+
+**Context:** Once `eval/out/calibration.json` was committed, `load_calibration_map` started
+returning `calibrated=True`, which flipped a Phase 2 endpoint test that asserted
+`confidence.calibrated is False`.
+
+**Fix:** `test_settings.calibration_path` points at a path that never exists, so confidence in
+tests is deterministically uncalibrated regardless of whether a real map is committed. Tests assert
+behavior, not the presence of an eval output.
+
+---
+
+## [Phase 3] Eval cost is per-process; a resumed run under-reports total spend
+
+`AnthropicClient` accumulates token usage on the instance, so `estimated_cost_usd` in
+`eval_results.json` reflects only the final process's calls. After a crash + resume, the reported
+$0.44 covers the resumed 57 questions; the full 100-question run cost ~$1-2 total. The `--max-cost`
+guard is also per-process. Acceptable for a budget guardrail; noted so the committed cost field is
+not mistaken for the all-in total.
+
+---
+
 ## [Phase 1] anthropic SDK 0.107.1 structured-output shape — verified
 
 **Context:** Phase 1 generation uses structured outputs to avoid fragile parsing of SQL

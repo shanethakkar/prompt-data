@@ -52,8 +52,11 @@ def _render_table(conn: sqlite3.Connection, table: str) -> str:
         header += f" — {description}"
     lines.append(header)
 
+    # Quote the table name: BIRD has tables named with reserved words (e.g. "order").
+    quoted = '"' + table.replace('"', '""') + '"'
+
     # PRAGMA table_info: (cid, name, type, notnull, dflt_value, pk)
-    columns = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    columns = conn.execute(f"PRAGMA table_info({quoted})").fetchall()
     pk_cols = [c[1] for c in columns if c[5]]
     for col in columns:
         name, col_type = col[1], col[2] or "TEXT"
@@ -67,7 +70,7 @@ def _render_table(conn: sqlite3.Connection, table: str) -> str:
         lines.append(f"  PRIMARY KEY ({', '.join(pk_cols)})")
 
     # PRAGMA foreign_key_list: (id, seq, table, from, to, on_update, on_delete, match)
-    fks = conn.execute(f"PRAGMA foreign_key_list({table})").fetchall()
+    fks = conn.execute(f"PRAGMA foreign_key_list({quoted})").fetchall()
     for fk in fks:
         ref_table, from_col, to_col = fk[2], fk[3], fk[4]
         lines.append(f"  FOREIGN KEY ({from_col}) REFERENCES {ref_table}({to_col})")
