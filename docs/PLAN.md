@@ -16,7 +16,7 @@ comes next. Full spec: docs/SPEC.md.
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
 | 3 | Eval harness | **Complete** (Sonnet/240 + calibration + trap eval: 59pp confidently-wrong reduction, 0 over-decline) |
-| 4 | Frontend core | Not started |
+| 4 | Frontend core | **In progress** |
 | 5 | Showcase pages | Not started |
 | 6 | Production and polish | Not started |
 
@@ -448,12 +448,64 @@ non-determinism (temp-0 primary reproducible, committed JSON canonical); eval me
 
 ---
 
-## Phase 4 — Frontend core *(expand before starting)*
+## Phase 4 — Frontend core (/ask + design system)
 
-Deliverables: Next.js 16 App Router scaffold, /ask page with full answer card, clarify-then-answer
-flow, streaming, design system (dark theme, cyan accent, Geist fonts, SVG charts).
+**Done when:** the demo DB is fully usable through the browser - a polished, responsive `/ask`
+page that streams the trust pipeline stage by stage and renders the full answer card (answer,
+SVG chart, sortable table, SQL+copy, assumptions, calibrated confidence, collapsible grounding),
+plus the clarify-then-answer flow. Showcase pages are Phase 5.
 
-*Expand this section at the start of Phase 4.*
+**Gate results:** *(fill in at end of phase)*
+- [ ] backend: `ruff`, `mypy backend/ eval/`, `pytest` (incl. new stream test); idle RSS still < 4 GB
+- [ ] frontend: `npm run lint`, `npx tsc --noEmit`, `npm run build`
+- [ ] E2E (Playwright): clear question -> answer card; ambiguous -> chips -> answer; screenshots
+
+### Versions (verified current 2026-06)
+Next.js 16.2.x (Turbopack default, React 19.2), Tailwind 4.3.x, shadcn/ui (Tailwind v4 mode),
+Node 22 LTS. Backend already current via uv floors; `sqlglot<26` is the only deliberate pin.
+
+### Decisions (locked)
+- UI primitives: **shadcn/ui** (Radix, accessible) themed via Tailwind v4 `@theme`; charts hand-built SVG.
+- Streaming: **real backend SSE** - refactor `respond()` into an event generator; `POST /ask/stream`
+  emits true stages; the UI shows genuine per-stage progress.
+- Scope: design system + complete `/ask` only.
+
+### 4 GB RAM guard (non-negotiable)
+The SSE endpoint runs in the uvicorn process: it reuses the existing pipeline, imports nothing heavy,
+and keeps anthropic lazy-imported. CORS middleware (starlette) is light. The RSS test must stay green
+after the backend change. The frontend is a separate Node/Vercel process, not subject to the server budget.
+
+### Skills -> tasks (how we hit "premium, major-company feel")
+frontend-design (visual system, answer card) · tailwind-v4-shadcn (scaffold/theme) ·
+nextjs-app-router-patterns (App Router + streaming) · framer-motion-animator (micro-interactions,
+prefers-reduced-motion) · frontend-ui-dark-ts (dark depth-card aesthetic) · tailwind-design-system
+(tokens) · chart-visualization (SVG charts) · webapp-testing + playwright-cli (verify + screenshots).
+
+### Part A - backend streaming
+- `answer.py`: `StageEvent` + `respond_events(...) -> Iterator[StageEvent]` yielding
+  stage events (ambiguity -> generating -> executing -> confidence) then a terminal
+  clarification/answer; `respond()` drains it (one path, existing /ask unchanged).
+- `main.py`: `POST /ask/stream` -> `StreamingResponse(text/event-stream)`; add light CORS.
+- `tests/test_stream.py`: assert SSE event order for clear + ambiguous (FakeLLMClient).
+
+### Part B - frontend scaffold (frontend/)
+create-next-app (App Router, TS strict, Tailwind v4, ESLint, Turbopack); shadcn init + primitives
+(button, card, dialog, tabs, tooltip, dropdown-menu, table, badge, skeleton, sonner, separator,
+scroll-area); `@theme` tokens (canvas #0c0c0e, off-white text, cyan #22d3ee, Geist Sans/Mono, OKLCH,
+dark default); `next.config.ts` rewrite `/api/:path*` -> `${API_BASE:-http://localhost:8000}`.
+
+### Part C - /ask (`/` is the ask page)
+`useAskStream` (POST /api/ask/stream, parse SSE, stage state machine) · `QuestionInput` (starter chips)
+· `ConversationThread` · `AnswerCard` (plain answer, `Chart` by chart_type stat|bar|line|table|none,
+sortable `ResultTable`, `SqlBlock` copy, `AssumptionsPanel`, `ConfidenceBadge` calibrated-vs-provisional,
+collapsible `Grounding`) · `ClarificationCard` (option chips -> re-stream with clarification_answer) ·
+`StageProgress`. Hand-built SVG charts, ARIA-labelled; framer-motion micro-interactions with
+prefers-reduced-motion; mobile-first. `lib/types.ts` mirrors backend shapes.
+
+### Risks (see plan file for full table)
+SSE buffering through the Next proxy (verify early; fall back to CORS+direct origin); RSS creep
+(re-run test); shadcn/Tailwind v4 setup churn (follow the skill); generic-AI look (drive with
+frontend-design); respond() refactor regressing non-streaming /ask (drain same generator; tests green).
 
 ---
 
