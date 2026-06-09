@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from dataclasses import asdict
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -22,17 +22,41 @@ from pydantic import BaseModel
 from backend.app.config import Settings, get_settings
 from backend.app.llm import LLMClient, get_llm_client
 from backend.app.pipeline.answer import TrustedResponse, respond, respond_events
+from backend.app.ratelimit import RateLimiter, RateLimitError
 
 app = FastAPI(title="Prompt Data", version="0.1.0")
 
-# The frontend normally calls a same-origin /api proxy (Next rewrite); CORS is a dev fallback
-# for calling the backend origin directly. Lightweight starlette middleware (no RAM impact).
+# In production the browser calls this origin directly (NEXT_PUBLIC_API_BASE), so CORS must
+# allow the deployed frontend origin; set CORS_ORIGINS to the Vercel URL. Defaults to localhost.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=list(get_settings().cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Process-local guard (single worker) protecting the Anthropic budget on the public /ask routes.
+_LIMITER = RateLimiter(get_settings().rate_limit_per_minute, get_settings().daily_request_cap)
+
+
+def _client_ip(request: Request) -> str:
+    """First hop of X-Forwarded-For (set by Render's proxy), else the socket peer."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def rate_guard(request: Request, settings: Annotated[Settings, Depends(get_settings)]) -> None:
+    """Dependency on the /ask routes. Disabled when both limits are <= 0 (tests)."""
+    if settings.rate_limit_per_minute <= 0 and settings.daily_request_cap <= 0:
+        return
+    try:
+        _LIMITER.check(_client_ip(request))
+    except RateLimitError as exc:
+        raise HTTPException(
+            status_code=429, detail=exc.message, headers={"Retry-After": str(exc.retry_after)}
+        ) from exc
 
 
 class AskRequest(BaseModel):
@@ -71,7 +95,7 @@ def _event_payload(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@app.post("/ask")
+@app.post("/ask", dependencies=[Depends(rate_guard)])
 async def ask(
     request: AskRequest,
     client: Annotated[LLMClient, Depends(get_llm_client)],
@@ -87,7 +111,7 @@ async def ask(
     return _serialize(result)
 
 
-@app.post("/ask/stream")
+@app.post("/ask/stream", dependencies=[Depends(rate_guard)])
 def ask_stream(
     request: AskRequest,
     client: Annotated[LLMClient, Depends(get_llm_client)],

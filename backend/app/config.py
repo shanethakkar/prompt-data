@@ -29,6 +29,9 @@ class Settings:
     self_consistency_samples: int
     self_consistency_temperature: float
     calibration_path: str
+    cors_origins: tuple[str, ...]
+    rate_limit_per_minute: int
+    daily_request_cap: int
 
 
 @lru_cache
@@ -43,4 +46,11 @@ def get_settings() -> Settings:
         self_consistency_samples=int(os.environ.get("SELF_CONSISTENCY_SAMPLES", "5")),
         self_consistency_temperature=float(os.environ.get("SELF_CONSISTENCY_TEMPERATURE", "0.7")),
         calibration_path=os.environ.get("CALIBRATION_PATH", "eval/out/calibration.json"),
+        cors_origins=tuple(
+            o.strip()
+            for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+            if o.strip()
+        ),
+        rate_limit_per_minute=int(os.environ.get("RATE_LIMIT_PER_MINUTE", "5")),
+        daily_request_cap=int(os.environ.get("DAILY_REQUEST_CAP", "500")),
     )

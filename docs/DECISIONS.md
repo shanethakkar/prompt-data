@@ -61,6 +61,29 @@ en-dash and the default cp1252 stdout could not encode it. Separately, the no-em
 
 ---
 
+## [Phase 6] Deploy: slim gzipped DB, in-memory guard, direct-CORS streaming
+
+- **Slim DB still exceeded 100 MB.** Dropping geolocation got demo.db to 112 MB; also dropping the
+  `review_comment_*` free-text columns only reached ~110 MB (the bulk is 32-char text keys + indexes,
+  not text). Solution: ship **`data/demo.db.gz` (50.9 MB)** committed, decompressed at Docker build
+  (and via `make unpack-db`). No git-lfs, no external Release. `delivered=96,478` still matches the
+  committed gallery/screenshots, so the live demo is consistent with the static showcase.
+- **`load_olist.py --slim`** builds the deploy DB (skip geolocation + drop review text + VACUUM).
+  `make load-db` is now slim; `make load-db-full` builds the full local DB (`data/demo.full.db`).
+- **Spend guard is process-local in-memory** (per-IP sliding minute window + global daily cap, UTC
+  reset) — correct only because the server is a single uvicorn worker. Disabled when both limits <= 0
+  (tests set 0). Client IP from the first `X-Forwarded-For` hop (Render's proxy). Adds no measurable
+  RAM (idle RSS still 5.6 MB).
+- **Prod streaming uses direct browser->Render CORS, not the Vercel proxy** — a long SSE stream
+  (20-40s, plus free-tier cold start) risks Vercel proxy timeouts. `NEXT_PUBLIC_API_BASE` set on
+  Vercel switches the fetch to the backend origin; local dev leaves it unset and uses the `/api`
+  rewrite. CORS is therefore load-bearing in prod (`CORS_ORIGINS` must equal the exact Vercel URL).
+- **Docker not installed locally** -> validated the Dockerfile/.dockerignore by inspection; Render
+  builds the image in the cloud. `.dockerignore` must exclude `data/raw` (1.9 GB) or the build
+  context upload is enormous.
+
+---
+
 ## [Phase 5] Showcase pages: static, honest, Vercel-ready
 
 - **All four showcase routes prerender as static** content from committed JSON (`frontend/content/*.json`,

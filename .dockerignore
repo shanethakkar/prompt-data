@@ -1,0 +1,28 @@
+# Keep the build context tiny. The image needs only pyproject/uv.lock, backend/,
+# data/demo.db.gz, and eval/out/calibration.json (all COPYed explicitly in the Dockerfile).
+.git
+.gitignore
+.github
+frontend
+node_modules
+**/__pycache__
+**/*.pyc
+.venv
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Large data: raw CSVs (1.9 GB) and the uncompressed / full DBs. Only demo.db.gz ships.
+data/raw
+data/demo.db
+data/demo.full.db
+
+# Eval scratch (calibration.json is still copied explicitly).
+eval/out/*.log
+eval/out/results.partial.jsonl
+eval/__pycache__
+
+# Docs, plans, screenshots — not needed at runtime.
+docs
+shots
+*.md

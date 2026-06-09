@@ -18,7 +18,7 @@ comes next. Full spec: docs/SPEC.md.
 | 3 | Eval harness | **Complete** (Sonnet/240 + calibration + trap eval: 59pp confidently-wrong reduction, 0 over-decline) |
 | 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
 | 5 | Showcase pages | **Complete** (4 static pages from committed JSON; Vercel-ready; screenshots reviewed) |
-| 6 | Deploy (Vercel + Render) | **In progress** |
+| 6 | Deploy (Vercel + Render) | **Complete** (repo deploy-ready + pushed; go-live via docs/DEPLOY.md) |
 
 ---
 
@@ -555,13 +555,15 @@ number drift (import JSON); capture cost (dry-run first, ~$1.5); dashboard overc
 and pushed to github.com/shanethakkar/prompt-data, with a `docs/DEPLOY.md` runbook. Cloud go-live
 (Render + Vercel dashboards, secrets) is user-driven via the runbook.
 
-**Gate results:** *(fill in at end of phase)*
-- [ ] slim `data/demo.db` built (no geolocation) and < 100 MB, committed; /ask works against it
-- [ ] backend: ruff, mypy backend/ eval/, pytest (incl. test_ratelimit); idle RSS < 4 GB
-- [ ] spend guard: per-IP + daily cap returns 429; /health unaffected
-- [ ] frontend: lint, tsc --noEmit, build; direct-CORS path works with NEXT_PUBLIC_API_BASE set
-- [ ] Dockerfile builds + serves (if Docker available locally); .dockerignore excludes data/raw
-- [ ] pushed to GitHub; DEPLOY.md runbook complete
+**Gate results:** (2026-06-09)
+- [x] slim DB: 110 MB uncompressed -> shipped as committed `data/demo.db.gz` (**50.9 MB**, decompressed
+      at Docker build); no geolocation, no review free-text; delivered=96,478 (matches the gallery)
+- [x] backend: ruff + mypy strict (43 files) clean; **98 tests** (incl. 4 test_ratelimit); idle RSS **5.6 MB**
+- [x] spend guard verified live: 1st /ask/stream streams answer (96,478), 2nd -> **429** + Retry-After;
+      CORS header returned for the allowed origin; /health unaffected
+- [x] frontend: lint, tsc, build green (5 static routes); fetch uses NEXT_PUBLIC_API_BASE in prod
+- [~] Dockerfile + .dockerignore written and inspected; Docker not installed locally -> Render builds in cloud
+- [x] Dockerfile/render.yaml/DEPLOY.md complete; push to github.com/shanethakkar/prompt-data
 
 ### Decisions (locked)
 - Host: **Render** (Docker, render.yaml blueprint). demo.db: **slim, committed** (drop geolocation).

@@ -190,13 +190,17 @@ def drop_tables(conn: sqlite3.Connection) -> None:
         conn.execute(f"DROP TABLE IF EXISTS {table}")
 
 
-def create_tables(conn: sqlite3.Connection) -> None:
+def create_tables(conn: sqlite3.Connection, slim: bool = False) -> None:
     for statement in _CREATE_STATEMENTS:
+        if slim and "CREATE TABLE geolocation" in statement:
+            continue
         conn.execute(statement)
 
 
-def create_indexes(conn: sqlite3.Connection) -> None:
+def create_indexes(conn: sqlite3.Connection, slim: bool = False) -> None:
     for statement in _INDEX_STATEMENTS:
+        if slim and "geolocation" in statement:
+            continue
         conn.execute(statement)
 
 
@@ -237,41 +241,60 @@ def load_csv(
     return rows
 
 
-def verify(conn: sqlite3.Connection) -> None:
-    """Run PRAGMA foreign_key_check and assert every table has rows."""
+def verify(conn: sqlite3.Connection, slim: bool = False) -> None:
+    """Run PRAGMA foreign_key_check and assert every loaded table has rows."""
     violations = conn.execute("PRAGMA foreign_key_check").fetchall()
     if violations:
         raise RuntimeError(f"Foreign key violations after load: {violations[:10]}")
 
     for table in _DROP_ORDER:
+        if slim and table == "geolocation":
+            continue
         (count,) = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
         if count == 0:
             raise RuntimeError(f"Table {table} is empty after load.")
         log.info("  %-36s %8d rows", table, count)
 
 
-def load_all(db_path: Path = DB_PATH, raw_dir: Path = RAW_DIR) -> None:
+# Free-text columns dropped from the slim build (the demo uses review_score only).
+_SLIM_DROP_COLUMNS: list[tuple[str, str]] = [
+    ("order_reviews", "review_comment_title"),
+    ("order_reviews", "review_comment_message"),
+]
+
+
+def load_all(db_path: Path = DB_PATH, raw_dir: Path = RAW_DIR, *, slim: bool = False) -> None:
     if not raw_dir.exists():
         raise FileNotFoundError(f"Raw CSV directory not found: {raw_dir}")
 
-    log.info("Building %s from %s", db_path, raw_dir)
+    log.info("Building %s from %s%s", db_path, raw_dir, " (slim)" if slim else "")
     conn = get_connection(db_path)
     try:
         drop_tables(conn)
-        create_tables(conn)
+        create_tables(conn, slim)
 
         for filename, table, dtype, chunksize in _LOAD_SPEC:
+            if slim and table == "geolocation":
+                continue
             rows = load_csv(conn, raw_dir / filename, table, dtype, chunksize)
             log.info("Loaded %-36s %8d rows", table, rows)
             if table == "product_category_name_translation":
                 seed_missing_categories(conn)
 
-        create_indexes(conn)
+        # Slim build: drop the large free-text review columns to fit the committed DB
+        # under GitHub's 100 MB limit. Geolocation is skipped above. See docs/DECISIONS.md.
+        if slim:
+            for table, column in _SLIM_DROP_COLUMNS:
+                conn.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
+
+        create_indexes(conn, slim)
         conn.execute("ANALYZE")
         conn.commit()
 
         log.info("Verifying foreign keys and row counts:")
-        verify(conn)
+        verify(conn, slim)
+        # Reclaim free pages so the committed slim DB is as small as possible.
+        conn.execute("VACUUM")
         log.info("Done. demo.db is ready.")
     finally:
         conn.close()
@@ -281,9 +304,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Load Olist CSVs into SQLite.")
     parser.add_argument("--db", type=Path, default=DB_PATH)
     parser.add_argument("--raw", type=Path, default=RAW_DIR)
+    parser.add_argument(
+        "--slim",
+        action="store_true",
+        help="Deploy-sized build: omit the geolocation table and the review free-text columns "
+        "so the committed data/demo.db stays under GitHub's 100 MB limit.",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    load_all(db_path=args.db, raw_dir=args.raw)
+    load_all(db_path=args.db, raw_dir=args.raw, slim=args.slim)
 
 
 if __name__ == "__main__":

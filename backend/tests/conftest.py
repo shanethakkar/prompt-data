@@ -108,4 +108,8 @@ def test_settings(fixture_db: str) -> Settings:
         # Point at a path that never exists so tests stay deterministic regardless of
         # whether a real eval/out/calibration.json has been committed.
         calibration_path="backend/tests/_no_such_calibration.json",
+        cors_origins=("http://localhost:3000",),
+        # Both <= 0 disables the /ask rate guard for deterministic endpoint tests.
+        rate_limit_per_minute=0,
+        daily_request_cap=0,
     )

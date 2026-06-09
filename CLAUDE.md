@@ -21,7 +21,7 @@ Embeddings: fastembed bge-small (ONNX). Storage: sqlite-vec or in-memory.
 Eval: BIRD dev (SQLite). Not Spider 2.0 full.
 
 ## Commands
-- Load demo DB:  uv run python data/load_olist.py  (or: make load-db)
+- Load demo DB:  make load-db (slim, shipped) | make unpack-db (from committed data/demo.db.gz, no CSVs) | make load-db-full (full local DB)
 - Run backend:   uv run uvicorn backend.app.main:app --workers 1
 - Run frontend:  cd frontend && npm run dev
 - Run eval:      uv run python eval/run_bird.py

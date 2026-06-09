@@ -13,8 +13,11 @@ build/
 # Environment
 .env
 
-# Generated data
+# Generated data. The slim DB ships gzipped and committed as data/demo.db.gz
+# (decompressed at Docker build / via `make unpack-db`); the uncompressed and
+# full-fidelity DBs are local-only.
 data/demo.db
+data/demo.full.db
 data/raw/
 
 # Eval outputs: eval_results.json and calibration.json ARE committed (the reproducibility
