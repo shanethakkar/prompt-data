@@ -18,7 +18,7 @@ comes next. Full spec: docs/SPEC.md.
 | 3 | Eval harness | **Complete** (Sonnet/240 + calibration + trap eval: 59pp confidently-wrong reduction, 0 over-decline) |
 | 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
 | 5 | Showcase pages | **Complete** (4 static pages from committed JSON; Vercel-ready; screenshots reviewed) |
-| 6 | Production and polish | Not started |
+| 6 | Deploy (Vercel + Render) | **In progress** |
 
 ---
 
@@ -549,10 +549,38 @@ number drift (import JSON); capture cost (dry-run first, ~$1.5); dashboard overc
 
 ---
 
-## Phase 6 — Production and polish *(expand before starting)*
+## Phase 6 — Deploy (Vercel frontend + Render backend)
 
-Deliverables: model routing and cost tracking, prompt-injection hardening, optional
-bring-your-own-DB, accessibility and mobile sweep, deploy, README with measured headline
-numbers and verified peak RSS.
+**Done when:** the repo is deploy-ready (prod config + spend guard + slim committed DB + Docker)
+and pushed to github.com/shanethakkar/prompt-data, with a `docs/DEPLOY.md` runbook. Cloud go-live
+(Render + Vercel dashboards, secrets) is user-driven via the runbook.
 
-*Expand this section at the start of Phase 6.*
+**Gate results:** *(fill in at end of phase)*
+- [ ] slim `data/demo.db` built (no geolocation) and < 100 MB, committed; /ask works against it
+- [ ] backend: ruff, mypy backend/ eval/, pytest (incl. test_ratelimit); idle RSS < 4 GB
+- [ ] spend guard: per-IP + daily cap returns 429; /health unaffected
+- [ ] frontend: lint, tsc --noEmit, build; direct-CORS path works with NEXT_PUBLIC_API_BASE set
+- [ ] Dockerfile builds + serves (if Docker available locally); .dockerignore excludes data/raw
+- [ ] pushed to GitHub; DEPLOY.md runbook complete
+
+### Decisions (locked)
+- Host: **Render** (Docker, render.yaml blueprint). demo.db: **slim, committed** (drop geolocation).
+- Frontend->backend: **direct CORS in prod** (NEXT_PUBLIC_API_BASE -> Render); local keeps /api rewrite.
+- GitHub: repo github.com/shanethakkar/prompt-data; push with the machine's credentials.
+
+### Parts
+- A: `load_olist.py --skip-geolocation` + VACUUM; commit slim `data/demo.db` (un-ignore); Makefile
+  `load-db` (slim) + `load-db-full`; the committed gallery/eval JSON is unaffected (no geo questions).
+- B: `config.py` add `cors_origins`/`rate_limit_per_minute`/`daily_request_cap`; new
+  `backend/app/ratelimit.py` (in-memory per-IP window + global daily cap, UTC reset); `main.py`
+  env-driven CORS + guard on /ask & /ask/stream (not /health); `test_ratelimit.py`.
+- C: `Dockerfile` (python:3.12-slim + uv, COPY backend/ + slim demo.db + calibration.json);
+  `.dockerignore` (exclude data/raw 1.9 GB, demo.full.db, frontend, .next, node_modules, .git);
+  `render.yaml` (docker web service, healthCheckPath /health, secrets sync:false).
+- D: `lib/use-ask.ts` endpoint base from `NEXT_PUBLIC_API_BASE` (prod direct CORS) else `/api`
+  (local proxy); `.env.local.example`.
+- E: `docs/DEPLOY.md` runbook (GitHub push, Render blueprint + secrets, Vercel import + env, smoke test).
+
+### Risks (see plan file)
+slim DB >100 MB (drop review_comment_* then git-lfs); Vercel SSE proxy timeout (direct CORS);
+Render cold start (documented, $7 always-on option); /ask abuse (guard); XFF parsing behind proxy.
