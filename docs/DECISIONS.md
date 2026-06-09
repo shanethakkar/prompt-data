@@ -61,6 +61,26 @@ en-dash and the default cp1252 stdout could not encode it. Separately, the no-em
 
 ---
 
+## [Phase 5] Showcase pages: static, honest, Vercel-ready
+
+- **All four showcase routes prerender as static** content from committed JSON (`frontend/content/*.json`,
+  synced from `eval/out` by `scripts/sync-content.mjs` on predev/prebuild). They need no backend, so the
+  site is largely deployable to Vercel ahead of Phase 6 (only `/ask` needs the hosted API).
+- **Committed the content copies** (not gitignored) so the Vercel build (root = frontend/) is
+  self-contained regardless of whether `../eval/out` is in the build context. The sync script only
+  refreshes them.
+- **Gallery is honest, not cherry-picked.** The capture (`run_gallery.py`, ~$0.28) shows 3 clarifications
+  and the rest answered with surfaced assumptions + confidence. None are embarrassing: the "email"
+  unanswerable returns an explicit "no email data" message, and the prompt-injection card neutralizes the
+  attack (counts customers, refuses PII) at confidence 0.24. The under-caught categories (grain, entity,
+  injection) are shown plainly on /evals rather than hidden.
+- **/methodology and /limitations are audience-authored TSX** (recruiter-friendly), distinct from the
+  engineering `docs/*.md`; key figures import from the committed JSON so prose and numbers never drift.
+- **Dev note:** a TaskStop'd `next start` can leave an orphan bound to :3000; use a fresh port for
+  follow-up previews rather than hunting the PID on Windows.
+
+---
+
 ## [Phase 4] Frontend scaffold + streaming findings
 
 - **create-next-app pulled a preview Next (16.3.0-preview.0)** whose SWC binary 404'd. Pinned

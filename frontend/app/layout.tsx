@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { Nav } from "@/components/site/nav";
 import "./globals.css";
 
 // Variable names match the @theme mapping in globals.css (--font-sans, --font-geist-mono).
@@ -19,8 +20,8 @@ export const metadata: Metadata = {
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5">
-        <Link href="/" className="group flex items-center gap-2.5">
+      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-5">
+        <Link href="/" className="group flex shrink-0 items-center gap-2.5">
           <span
             className="size-2 rounded-full bg-primary shadow-[0_0_12px_2px_var(--color-primary)]"
             aria-hidden
@@ -29,9 +30,7 @@ function SiteHeader() {
             VERITY
           </span>
         </Link>
-        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-          Trust-layer NL&#8594;SQL
-        </span>
+        <Nav />
       </div>
     </header>
   );

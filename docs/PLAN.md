@@ -17,7 +17,7 @@ comes next. Full spec: docs/SPEC.md.
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
 | 3 | Eval harness | **Complete** (Sonnet/240 + calibration + trap eval: 59pp confidently-wrong reduction, 0 over-decline) |
 | 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
-| 5 | Showcase pages | **In progress** |
+| 5 | Showcase pages | **Complete** (4 static pages from committed JSON; Vercel-ready; screenshots reviewed) |
 | 6 | Production and polish | Not started |
 
 ---
@@ -520,11 +520,14 @@ frontend-design); respond() refactor regressing non-streaming /ask (drain same g
 dashboard metrics are real (from committed JSON); offline + frontend gates green; screenshots reviewed.
 All four are static (no backend) -> Vercel-ready ahead of Phase 6.
 
-**Gate results:** *(fill in at end of phase)*
-- [ ] backend: ruff, mypy backend/ eval/, pytest (incl. test_gallery); 4 GB unaffected (offline eval)
-- [ ] paid gallery capture -> committed eval/out/gallery.json
-- [ ] frontend: npm run lint, tsc --noEmit, next build (5 routes)
-- [ ] Playwright screenshots of the four pages reviewed; numbers match committed JSON
+**Gate results:** (2026-06-09)
+- [x] backend: ruff + mypy strict (41 files) clean; 94 tests pass (incl. test_gallery); 4 GB unaffected
+- [x] paid gallery capture (Sonnet, ~$0.28) -> committed `eval/out/gallery.json` (12 cards, 3 clarify)
+- [x] frontend: lint clean, tsc clean, `next build` -> **all 5 routes prerender as static** (/, /evals,
+      /gallery, /methodology, /limitations) -> the showcase pages need no backend (Vercel-ready)
+- [x] Playwright screenshots of all four reviewed: /evals dashboard (signature ablation 100%->41%,
+      reliability diagram near the diagonal, by-category slip-through, clarification 1.00/0.70/0.00),
+      /gallery contrast cards, /methodology + /limitations. Numbers match the committed JSON.
 
 ### Decisions (locked)
 - /gallery: capture REAL baseline-vs-Verity outputs via `eval/run_gallery.py` -> `gallery.json` (I run it, ~$1-1.5).
