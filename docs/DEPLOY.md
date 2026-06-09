@@ -7,6 +7,26 @@ work that can't be scripted from here.
 
 Order matters: push to GitHub, deploy the backend, deploy the frontend, then connect the two origins.
 
+## Keep the frontend and backend in sync (do this first)
+
+The two halves must deploy together. If Vercel ships a new frontend while Render is still on an old
+backend (or vice versa), the SSE event shapes drift and the live site breaks in confusing ways. Real
+examples we hit: the answer card vanished when a new "confidence" event met an old frontend; the schema
+drawer 404'd because Render lacked the new `/schema` route; SQL stayed single-line because the formatter
+change never deployed. **After every push, confirm BOTH redeployed before testing.**
+
+Verify auto-deploy is on (one-time):
+- **Render:** Service -> **Settings -> Build & Deploy -> Auto-Deploy = On Commit**. If it's off, every
+  push needs a manual **Manual Deploy -> Deploy latest commit**.
+- **Vercel:** Project -> **Settings -> Git** -> production branch is `main` and deploys are enabled
+  (Vercel auto-deploys pushes by default).
+
+After a push, check both caught up:
+- Backend: `curl https://prompt-data-api.onrender.com/health` returns 200, and a recently added route
+  responds, e.g. `curl https://prompt-data-api.onrender.com/schema` returns JSON (not 404).
+- Frontend: open the Vercel **Deployments** tab and confirm the latest commit hash deployed; hard-refresh
+  the site. If only one side updated, trigger a manual redeploy on the other and retest.
+
 ## 0. Push to GitHub (one time)
 ```bash
 git remote add origin https://github.com/shanethakkar/prompt-data.git
