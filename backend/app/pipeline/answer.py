@@ -209,7 +209,11 @@ def respond_events(
         return
 
     assumptions = extract_assumptions(result.sql)
-    yield {"type": "stage", "name": "confidence", "label": "Sampling for a confidence score"}
+    # Emit the answer (data, SQL, assumptions) immediately so it never waits on confidence;
+    # confidence is scored next and streamed as its own event.
+    yield {"type": "answer", "answer": answer, "assumptions": assumptions, "confidence": None}
+
+    yield {"type": "stage", "name": "confidence", "label": "Scoring confidence"}
     agreement, k = self_consistency(
         effective_question,
         client=client,
@@ -227,7 +231,7 @@ def respond_events(
         retrieval_score=_RETRIEVAL_SCORE_PLACEHOLDER,
         calibration=load_calibration_map(settings.calibration_path),
     )
-    yield {"type": "answer", "answer": answer, "assumptions": assumptions, "confidence": confidence}
+    yield {"type": "confidence", "confidence": confidence}
 
 
 def respond(
@@ -238,21 +242,27 @@ def respond(
     clarification_answer: str | None = None,
 ) -> TrustedResponse:
     """Drain respond_events into a single TrustedResponse (non-streaming callers)."""
-    terminal: dict[str, Any] = {}
+    answer_event: dict[str, Any] | None = None
+    clarification: Clarification | None = None
+    confidence: Confidence | None = None
     for event in respond_events(
         question, client=client, settings=settings, clarification_answer=clarification_answer
     ):
-        if event["type"] in ("clarification", "answer"):
-            terminal = event
+        if event["type"] == "clarification":
+            clarification = event["clarification"]
+        elif event["type"] == "answer":
+            answer_event = event
+        elif event["type"] == "confidence":
+            confidence = event["confidence"]
 
-    if terminal.get("type") == "clarification":
-        return TrustedResponse(
-            question=question, kind="clarification", clarification=terminal["clarification"]
-        )
+    if clarification is not None:
+        return TrustedResponse(question=question, kind="clarification", clarification=clarification)
+    if answer_event is None:
+        return TrustedResponse(question=question, kind="answer")
     return TrustedResponse(
         question=question,
         kind="answer",
-        answer=terminal.get("answer"),
-        assumptions=terminal.get("assumptions"),
-        confidence=terminal.get("confidence"),
+        answer=answer_event["answer"],
+        assumptions=answer_event["assumptions"],
+        confidence=confidence,
     )

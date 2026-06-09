@@ -9,6 +9,7 @@ requested type.
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from pydantic import BaseModel
@@ -50,7 +51,9 @@ class AnthropicClient:
 
     def __init__(self, client: anthropic.Anthropic) -> None:
         self._client = client
-        # Cumulative token usage, read by the offline eval to compute cost.
+        # Cumulative token usage, read by the offline eval to compute cost. Guarded by a
+        # lock because self-consistency issues concurrent generate_structured calls.
+        self._usage_lock = threading.Lock()
         self.input_tokens = 0
         self.output_tokens = 0
         self.calls = 0
@@ -74,9 +77,10 @@ class AnthropicClient:
             thinking={"type": "disabled"},
         )
         usage = response.usage
-        self.input_tokens += usage.input_tokens + (usage.cache_read_input_tokens or 0)
-        self.output_tokens += usage.output_tokens
-        self.calls += 1
+        with self._usage_lock:
+            self.input_tokens += usage.input_tokens + (usage.cache_read_input_tokens or 0)
+            self.output_tokens += usage.output_tokens
+            self.calls += 1
 
         parsed = response.parsed_output
         if parsed is None:

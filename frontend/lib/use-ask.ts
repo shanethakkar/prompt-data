@@ -91,15 +91,19 @@ export function useAsk() {
               clarification: event.clarification,
               stages: [],
             });
-          } else {
+          } else if (event.type === "answer") {
+            // The answer streams before confidence; show it now, mark confidence as pending.
             patch(id, {
               status: "done",
               kind: "answer",
               answer: event.answer,
               assumptions: event.assumptions,
               confidence: event.confidence,
+              scoringConfidence: event.confidence == null,
               stages: [],
             });
+          } else if (event.type === "confidence") {
+            patch(id, { confidence: event.confidence, scoringConfidence: false });
           }
         }
         // Mark any turn still streaming (no terminal event) as done to clear spinners.

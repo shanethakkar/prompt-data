@@ -8,6 +8,7 @@ file in tmp_path; tests never touch the real (gitignored) demo.db.
 from __future__ import annotations
 
 import sqlite3
+import threading
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import TypeVar, cast
@@ -32,6 +33,8 @@ class FakeLLMClient:
     def __init__(self, responses: Sequence[BaseModel]) -> None:
         self._responses = list(responses)
         self.calls: list[dict[str, object]] = []
+        # self_consistency now issues concurrent calls, so guard the queue.
+        self._lock = threading.Lock()
 
     def generate_structured(
         self,
@@ -42,21 +45,22 @@ class FakeLLMClient:
         output_format: type[T],
         temperature: float,
     ) -> T:
-        self.calls.append(
-            {
-                "model": model,
-                "system": system,
-                "user": user,
-                "output_format": output_format,
-                "temperature": temperature,
-            }
-        )
-        if not self._responses:
-            raise AssertionError("FakeLLMClient ran out of queued responses.")
-        for i, response in enumerate(self._responses):
-            if isinstance(response, output_format):
-                return cast(T, self._responses.pop(i))
-        return cast(T, self._responses.pop(0))
+        with self._lock:
+            self.calls.append(
+                {
+                    "model": model,
+                    "system": system,
+                    "user": user,
+                    "output_format": output_format,
+                    "temperature": temperature,
+                }
+            )
+            if not self._responses:
+                raise AssertionError("FakeLLMClient ran out of queued responses.")
+            for i, response in enumerate(self._responses):
+                if isinstance(response, output_format):
+                    return cast(T, self._responses.pop(i))
+            return cast(T, self._responses.pop(0))
 
 
 def build_fixture_db(path: str) -> None:

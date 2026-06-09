@@ -18,6 +18,7 @@ import bisect
 import json
 import os
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -87,6 +88,43 @@ def canonicalize_rows(columns: list[str], rows: list[tuple[Any, ...]]) -> Canoni
     return tuple(sorted(normalized, key=repr))
 
 
+def _sample_matches(
+    question: str,
+    *,
+    client: LLMClient,
+    model: str,
+    db_path: str,
+    schema_context: str,
+    semantic_context: str,
+    settings: Settings,
+    target: CanonicalResult,
+) -> bool:
+    """One self-consistency vote: generate, run, and compare to the primary result.
+
+    A sample that fails validation, errors, or times out is a non-match (counts against).
+    """
+    sample = generate_sql(
+        question,
+        client=client,
+        model=model,
+        schema_context=schema_context,
+        semantic_context=semantic_context,
+        temperature=settings.self_consistency_temperature,
+    )
+    try:
+        execution = execute_query(
+            sample.sql,
+            db_path,
+            default_limit=settings.sql_default_limit,
+            timeout_seconds=settings.sql_timeout_seconds,
+        )
+    except (ValidationError, sqlite3.Error):
+        return False
+    if execution.timed_out:
+        return False
+    return canonicalize_rows(execution.columns, execution.rows) == target
+
+
 def self_consistency(
     question: str,
     *,
@@ -100,37 +138,33 @@ def self_consistency(
 ) -> tuple[float, int]:
     """Sample K-1 extra generations at nonzero temperature; return (agreement, K).
 
-    The primary counts as one of the K votes. Samples that fail validation,
-    error, or time out count as non-matching.
+    The primary counts as one of the K votes. The K-1 samples run concurrently (each is an
+    independent LLM call + read-only query), so this stage takes about as long as a single
+    extra generation rather than K-1 sequential ones. The agreement value is order-independent.
     """
     k = max(1, settings.self_consistency_samples)
     if k == 1:
         return 1.0, 1
 
     target = canonicalize_rows(primary_execution.columns, primary_execution.rows)
-    matches = 1  # the primary itself
-    for _ in range(k - 1):
-        sample = generate_sql(
-            question,
-            client=client,
-            model=model,
-            schema_context=schema_context,
-            semantic_context=semantic_context,
-            temperature=settings.self_consistency_temperature,
-        )
-        try:
-            execution = execute_query(
-                sample.sql,
-                db_path,
-                default_limit=settings.sql_default_limit,
-                timeout_seconds=settings.sql_timeout_seconds,
+    with ThreadPoolExecutor(max_workers=k - 1) as pool:
+        votes = [
+            pool.submit(
+                _sample_matches,
+                question,
+                client=client,
+                model=model,
+                db_path=db_path,
+                schema_context=schema_context,
+                semantic_context=semantic_context,
+                settings=settings,
+                target=target,
             )
-        except (ValidationError, sqlite3.Error):
-            continue
-        if execution.timed_out:
-            continue
-        if canonicalize_rows(execution.columns, execution.rows) == target:
-            matches += 1
+            for _ in range(k - 1)
+        ]
+        matches = 1 + sum(
+            1 for v in votes if v.result()
+        )  # the primary itself plus agreeing samples
 
     return matches / k, k
 

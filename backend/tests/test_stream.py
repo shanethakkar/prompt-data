@@ -48,11 +48,16 @@ def test_stream_answer_sequence(test_settings: Settings) -> None:
     types = [e["type"] for e in events]
     assert types[0] == "stage" and events[0]["name"] == "ambiguity"
     assert "generating" in [e.get("name") for e in events if e["type"] == "stage"]
-    assert types[-1] == "answer"
-    terminal = events[-1]
-    assert terminal["answer"]["row_count"] == 2
-    assert terminal["assumptions"]["tables"] == ["order_items", "products"]
-    assert terminal["confidence"]["calibrated"] is False
+
+    # The answer streams before confidence (decoupled), and confidence is the terminal event.
+    answer = next(e for e in events if e["type"] == "answer")
+    confidence = next(e for e in events if e["type"] == "confidence")
+    assert types.index("answer") < types.index("confidence")
+    assert types[-1] == "confidence"
+    assert answer["answer"]["row_count"] == 2
+    assert answer["assumptions"]["tables"] == ["order_items", "products"]
+    assert answer["confidence"] is None
+    assert confidence["confidence"]["calibrated"] is False
 
 
 def test_stream_clarification_sequence(test_settings: Settings) -> None:

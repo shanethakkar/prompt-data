@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import type { AnswerResult, Assumptions, Confidence } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Chart } from "@/components/charts/chart";
@@ -18,14 +18,25 @@ function MetaPill({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ScoringPill() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/50 px-3 py-1.5 text-xs text-muted-foreground">
+      <Loader2 className="size-3.5 animate-spin" />
+      Scoring confidence…
+    </div>
+  );
+}
+
 export function AnswerCard({
   answer,
   assumptions,
   confidence,
+  scoring,
 }: {
   answer: AnswerResult;
   assumptions?: Assumptions | null;
   confidence?: Confidence | null;
+  scoring?: boolean;
 }) {
   const reduce = useReducedMotion();
   const hasChart = answer.chart_type === "bar" || answer.chart_type === "line";
@@ -42,7 +53,13 @@ export function AnswerCard({
         <p className="text-pretty text-[15px] leading-relaxed text-foreground">
           {answer.explanation}
         </p>
-        {confidence && <div className="shrink-0">{<ConfidenceBadge confidence={confidence} />}</div>}
+        <div className="shrink-0">
+          {confidence ? (
+            <ConfidenceBadge confidence={confidence} />
+          ) : scoring ? (
+            <ScoringPill />
+          ) : null}
+        </div>
       </div>
 
       {answer.error ? (

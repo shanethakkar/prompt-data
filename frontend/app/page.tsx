@@ -69,6 +69,7 @@ export default function AskPage() {
                     answer={turn.answer}
                     assumptions={turn.assumptions}
                     confidence={turn.confidence}
+                    scoring={turn.scoringConfidence}
                   />
                 )}
 
