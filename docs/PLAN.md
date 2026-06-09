@@ -13,7 +13,7 @@ comes next. Full spec: docs/SPEC.md.
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
-| 1 | Core text-to-SQL | Not started |
+| 1 | Core text-to-SQL | **Code-complete** (offline gates green; live smoke pending API key) |
 | 2 | Trust layer | Not started |
 | 3 | Eval harness | Not started |
 | 4 | Frontend core | Not started |
@@ -226,14 +226,34 @@ cleanly in fixture teardown.
 
 ---
 
-## Phase 1 — Core text-to-SQL *(expand before starting)*
+## Phase 1 — Core text-to-SQL
 
-Deliverables: schema card and embedding retrieval, SQL generation via Anthropic API,
-validation and execution through Phase 0 sandbox, self-correction loop.
+**Done when:** straightforward Olist questions answer correctly end-to-end via CLI and
+`/ask`, with offline gates green and a recorded live smoke.
 
-Done when: a set of straightforward Olist questions answer correctly end-to-end via CLI or API.
+**Verified gate results:** (2026-06-09, anthropic 0.107.1, Python 3.12.13)
+- [x] `uv run ruff check backend/ data/ eval/` — clean
+- [x] `uv run mypy backend/` — clean (strict, 21 files)
+- [x] `uv run pytest backend/tests/ -q` — 52 passed, idle RSS still **5.6 MB**
+- [ ] Live CLI smoke against the Anthropic API — **PENDING**: no `ANTHROPIC_API_KEY`
+  configured (no `.env`). Cannot run without a key; results will not be fabricated.
 
-*Expand this section at the start of Phase 1.*
+**What shipped:**
+- `config.py` (env settings), `llm.py` (LLMClient protocol + AnthropicClient adapter using
+  `messages.parse` structured outputs, system prompt cached via `cache_control`)
+- `semantic_layer.py` (business-term resolutions), `pipeline/schema.py` (read-only
+  introspection + hand-authored Olist descriptions, retrieval seam)
+- `pipeline/route.py` (model seam), `pipeline/generate.py` (structured `SqlGeneration`
+  + self-correction loop), `pipeline/answer.py` (orchestrator + chart heuristic)
+- `cli.py` and `POST /ask` (settings + client injected as FastAPI dependencies)
+- 21 new mocked tests; fixture DB only, never the real demo.db
+
+**Decisions confirmed during build (see docs/DECISIONS.md):**
+- anthropic 0.107.1 has `messages.parse(output_format=Model)`; result via `.parsed_output`
+- Server does not import the SDK at startup (lazy import in `build_client`), so idle RSS holds at 5.6 MB
+
+**Remaining to close Phase 1:** run the live smoke once a key is available, record the
+generated SQL / row counts / any self-correction here, then mark complete.
 
 ---
 

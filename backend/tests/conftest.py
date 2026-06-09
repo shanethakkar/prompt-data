@@ -1,0 +1,97 @@
+"""Shared fixtures for the Phase 1 pipeline tests.
+
+The fake LLM client returns queued, pre-canned structured outputs, so tests are
+deterministic and spend no tokens. The fixture DB is a tiny Olist-shaped SQLite
+file in tmp_path; tests never touch the real (gitignored) demo.db.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from collections.abc import Iterator
+from pathlib import Path
+from typing import TypeVar, cast
+
+import pytest
+from pydantic import BaseModel
+
+from backend.app.config import Settings
+
+T = TypeVar("T", bound=BaseModel)
+
+
+class FakeLLMClient:
+    """Deterministic LLMClient: pops a queued response per call, records inputs."""
+
+    def __init__(self, responses: list[BaseModel]) -> None:
+        self._responses = list(responses)
+        self.calls: list[dict[str, object]] = []
+
+    def generate_structured(
+        self,
+        *,
+        model: str,
+        system: str,
+        user: str,
+        output_format: type[T],
+        temperature: float,
+    ) -> T:
+        self.calls.append(
+            {
+                "model": model,
+                "system": system,
+                "user": user,
+                "output_format": output_format,
+                "temperature": temperature,
+            }
+        )
+        if not self._responses:
+            raise AssertionError("FakeLLMClient ran out of queued responses.")
+        return cast(T, self._responses.pop(0))
+
+
+def build_fixture_db(path: str) -> None:
+    """Create a tiny Olist-shaped DB: products and order_items with an FK."""
+    conn = sqlite3.connect(path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("CREATE TABLE products (product_id TEXT PRIMARY KEY, product_category_name TEXT)")
+    conn.execute(
+        "CREATE TABLE order_items ("
+        "order_id TEXT NOT NULL, order_item_id INTEGER NOT NULL, "
+        "product_id TEXT REFERENCES products(product_id), "
+        "price REAL NOT NULL, freight_value REAL NOT NULL, "
+        "PRIMARY KEY (order_id, order_item_id))"
+    )
+    conn.executemany(
+        "INSERT INTO products VALUES (?, ?)",
+        [("p1", "toys"), ("p2", "books"), ("p3", "toys")],
+    )
+    conn.executemany(
+        "INSERT INTO order_items VALUES (?, ?, ?, ?, ?)",
+        [
+            ("o1", 1, "p1", 30.0, 5.0),
+            ("o2", 1, "p2", 10.0, 2.0),
+            ("o3", 1, "p3", 20.0, 3.0),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+
+@pytest.fixture
+def fixture_db(tmp_path: Path) -> Iterator[str]:
+    db_path = str(tmp_path / "fixture.db")
+    build_fixture_db(db_path)
+    yield db_path
+
+
+@pytest.fixture
+def test_settings(fixture_db: str) -> Settings:
+    return Settings(
+        anthropic_api_key="test-key",
+        demo_db_path=fixture_db,
+        generation_model="claude-sonnet-4-6",
+        sql_default_limit=500,
+        sql_timeout_seconds=10.0,
+        max_self_correction_attempts=2,
+    )

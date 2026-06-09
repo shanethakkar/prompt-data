@@ -10,6 +10,39 @@ Do not record things that are obvious from the code or spec.
 
 ---
 
+## [Phase 1] anthropic SDK 0.107.1 structured-output shape — verified
+
+**Context:** Phase 1 generation uses structured outputs to avoid fragile parsing of SQL
+out of free text. The plan flagged that the SDK API could vary by version.
+
+**Findings (verified against the installed 0.107.1):**
+- `client.messages.parse(...)` exists and accepts `output_format=<PydanticModel>`,
+  `system`, `messages`, `temperature`, `thinking`.
+- The parsed object is read via the `ParsedMessage.parsed_output` property
+  (`Optional[T]`); it walks the content blocks and returns the first parsed text block.
+- No fallback to `output_config` was needed. `AnthropicClient.generate_structured`
+  raises `LLMError` if `parsed_output` is `None`.
+
+**Design:** the pipeline depends on a narrow `LLMClient` Protocol with a single
+`generate_structured(...)` method, not on `anthropic.Anthropic` directly. The real
+adapter and the test `FakeLLMClient` both satisfy it, so mypy strict passes and tests
+spend no tokens.
+
+---
+
+## [Phase 1] Server must not import the anthropic SDK at startup
+
+**Context:** the 4 GB ceiling and the idle-RSS test (5.6 MB) depend on the server process
+staying lean.
+
+**Decision:** `llm.py` imports `anthropic` only under `TYPE_CHECKING` and lazily inside
+`build_client()`. `main.py` imports the `LLMClient` Protocol (light) and the pipeline, not
+the SDK. Result: idle server RSS stays at **5.6 MB** with `/ask` wired in. If a future change
+imports `anthropic` at module top-level, the RSS test will still pass (the SDK is light) but
+keep the lazy import to preserve headroom for fastembed in Phase 3.
+
+---
+
 ## [Phase 0] sqlglot 25 AST root types — verified by running `uv run --with sqlglot`
 
 **Context:** The SQL validator in `execute.py` uses sqlglot to parse incoming queries and
