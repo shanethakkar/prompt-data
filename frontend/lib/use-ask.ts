@@ -92,7 +92,8 @@ export function useAsk() {
               stages: [],
             });
           } else if (event.type === "answer") {
-            // The answer streams before confidence; show it now, mark confidence as pending.
+            // The answer streams first with confidence null (scoring pill), then a second
+            // answer event re-sends it with the scored confidence filled in.
             patch(id, {
               status: "done",
               kind: "answer",
@@ -102,8 +103,6 @@ export function useAsk() {
               scoringConfidence: event.confidence == null,
               stages: [],
             });
-          } else if (event.type === "confidence") {
-            patch(id, { confidence: event.confidence, scoringConfidence: false });
           }
         }
         // Mark any turn still streaming (no terminal event) as done to clear spinners.

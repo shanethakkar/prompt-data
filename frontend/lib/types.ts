@@ -50,8 +50,7 @@ export type StageEvent =
       answer: AnswerResult;
       assumptions: Assumptions | null;
       confidence: Confidence | null;
-    }
-  | { type: "confidence"; confidence: Confidence };
+    };
 
 export interface Stage {
   name: string;

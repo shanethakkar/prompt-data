@@ -99,8 +99,6 @@ def _event_payload(event: dict[str, Any]) -> dict[str, Any]:
         return {"type": "stage", "name": event["name"], "label": event["label"]}
     if etype == "clarification":
         return {"type": "clarification", "clarification": asdict(event["clarification"])}
-    if etype == "confidence":
-        return {"type": "confidence", "confidence": asdict(event["confidence"])}
     answer = event["answer"]
     answer_dict = asdict(answer)
     answer_dict["rows"] = [list(row) for row in answer.rows]

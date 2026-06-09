@@ -231,7 +231,10 @@ def respond_events(
         retrieval_score=_RETRIEVAL_SCORE_PLACEHOLDER,
         calibration=load_calibration_map(settings.calibration_path),
     )
-    yield {"type": "confidence", "confidence": confidence}
+    # Re-emit the full answer, now scored. Using a second "answer" event (rather than a new
+    # event type) keeps the stream backward-compatible: an older deployed frontend re-renders
+    # the same answer with confidence instead of mishandling an unknown event and clearing it.
+    yield {"type": "answer", "answer": answer, "assumptions": assumptions, "confidence": confidence}
 
 
 def respond(
@@ -244,16 +247,13 @@ def respond(
     """Drain respond_events into a single TrustedResponse (non-streaming callers)."""
     answer_event: dict[str, Any] | None = None
     clarification: Clarification | None = None
-    confidence: Confidence | None = None
     for event in respond_events(
         question, client=client, settings=settings, clarification_answer=clarification_answer
     ):
         if event["type"] == "clarification":
             clarification = event["clarification"]
         elif event["type"] == "answer":
-            answer_event = event
-        elif event["type"] == "confidence":
-            confidence = event["confidence"]
+            answer_event = event  # the last answer event carries the scored confidence
 
     if clarification is not None:
         return TrustedResponse(question=question, kind="clarification", clarification=clarification)
@@ -264,5 +264,5 @@ def respond(
         kind="answer",
         answer=answer_event["answer"],
         assumptions=answer_event["assumptions"],
-        confidence=confidence,
+        confidence=answer_event["confidence"],
     )
