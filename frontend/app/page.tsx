@@ -7,6 +7,7 @@ import { QuestionInput } from "@/components/ask/question-input";
 import { StageProgress } from "@/components/ask/stage-progress";
 import { AnswerCard } from "@/components/ask/answer-card";
 import { ClarificationCard } from "@/components/ask/clarification-card";
+import { SchemaDrawer } from "@/components/ask/schema-drawer";
 
 export default function AskPage() {
   const { turns, isStreaming, submit, clarify } = useAsk();
@@ -38,6 +39,9 @@ export default function AskPage() {
               assumptions it made, asks when a question is ambiguous instead of guessing, and
               attaches a calibrated confidence signal.
             </p>
+            <div className="mt-5">
+              <SchemaDrawer />
+            </div>
           </motion.div>
           <QuestionInput onSubmit={submit} disabled={isStreaming} showStarters />
         </div>
@@ -81,6 +85,9 @@ export default function AskPage() {
           </div>
 
           <div className="sticky bottom-0 mt-auto border-t border-border/60 bg-background/80 py-4 backdrop-blur-xl">
+            <div className="mb-2.5 flex justify-end">
+              <SchemaDrawer label="Data" />
+            </div>
             <QuestionInput onSubmit={submit} disabled={isStreaming} />
           </div>
         </>

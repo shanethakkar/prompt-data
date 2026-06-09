@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from backend.app.config import Settings, get_settings
 from backend.app.llm import LLMClient, get_llm_client
 from backend.app.pipeline.answer import TrustedResponse, respond, respond_events
+from backend.app.pipeline.schema import schema_tables
 from backend.app.ratelimit import RateLimiter, RateLimitError
 
 app = FastAPI(title="Prompt Data", version="0.1.0")
@@ -68,6 +69,20 @@ class AskRequest(BaseModel):
 async def health() -> dict[str, str]:
     """Liveness probe used by the RSS test and deployment health checks."""
     return {"status": "ok", "version": "0.1.0"}
+
+
+@app.get("/schema")
+def schema(
+    settings: Annotated[Settings, Depends(get_settings)],
+    session: str | None = None,
+) -> dict[str, Any]:
+    """Structured schema for the active dataset so the UI shows what can be asked.
+
+    `session` selects a bring-your-own-data upload (Part C); until then it resolves to Olist.
+    """
+    _ = session
+    tables = [asdict(table) for table in schema_tables(settings.demo_db_path)]
+    return {"dataset": "olist", "tables": tables}
 
 
 def _serialize(result: TrustedResponse) -> dict[str, Any]:

@@ -1,15 +1,13 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { apiUrl } from "@/lib/api";
 import type { StageEvent, Turn } from "@/lib/types";
 
 let counter = 0;
 const nextId = () => `turn-${Date.now()}-${counter++}`;
 
-// Prod (Vercel): NEXT_PUBLIC_API_BASE is the Render backend root, called directly (CORS) so the
-// long SSE stream avoids any proxy timeout. Local dev leaves it unset and uses the Next /api rewrite.
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
-const STREAM_URL = API_BASE ? `${API_BASE}/ask/stream` : "/api/ask/stream";
+const STREAM_URL = apiUrl("/ask/stream");
 
 /** Parse a fetch ReadableStream of SSE `data: {json}` frames into StageEvents. */
 async function* readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<StageEvent> {

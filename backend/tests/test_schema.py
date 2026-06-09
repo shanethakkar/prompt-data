@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.app.pipeline.schema import build_schema_card, select_schema_context
+from backend.app.pipeline.schema import build_schema_card, schema_tables, select_schema_context
 
 
 def test_card_lists_tables_and_columns(fixture_db: str) -> None:
@@ -32,3 +32,14 @@ def test_card_includes_known_descriptions(fixture_db: str) -> None:
 def test_select_schema_context_returns_full_card_in_phase_1(fixture_db: str) -> None:
     card = build_schema_card(fixture_db)
     assert select_schema_context("any question", card) == card
+
+
+def test_schema_tables_structured(fixture_db: str) -> None:
+    tables = {t.name: t for t in schema_tables(fixture_db)}
+    assert "order_items" in tables
+    items = tables["order_items"]
+    assert items.row_count > 0
+    cols = {c.name: c for c in items.columns}
+    assert cols["order_id"].primary_key is True
+    assert "product_id -> products(product_id)" in items.foreign_keys
+    assert tables["products"].description is not None

@@ -10,6 +10,7 @@ Phase 3; for Phase 1 the whole card fits the prompt and is sent in full.
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 from functools import lru_cache
 
 from backend.app.pipeline.execute import _open_readonly
@@ -78,7 +79,8 @@ def _render_table(conn: sqlite3.Connection, table: str) -> str:
     return "\n".join(lines)
 
 
-@lru_cache
+# maxsize bounds the cache now that db_path varies per bring-your-own-data session.
+@lru_cache(maxsize=32)
 def build_schema_card(db_path: str) -> str:
     """Introspect db_path read-only and render the full schema card."""
     conn = _open_readonly(db_path)
@@ -87,6 +89,57 @@ def build_schema_card(db_path: str) -> str:
     finally:
         conn.close()
     return "\n\n".join(blocks)
+
+
+@dataclass
+class ColumnInfo:
+    name: str
+    type: str
+    note: str | None
+    primary_key: bool
+
+
+@dataclass
+class TableInfo:
+    name: str
+    description: str | None
+    row_count: int
+    columns: list[ColumnInfo]
+    foreign_keys: list[str]  # human-readable "from_col -> ref_table(to_col)"
+
+
+def _table_info(conn: sqlite3.Connection, table: str) -> TableInfo:
+    quoted = '"' + table.replace('"', '""') + '"'
+    columns = [
+        ColumnInfo(
+            name=col[1],
+            type=col[2] or "TEXT",
+            note=COLUMN_NOTES.get((table, col[1])),
+            primary_key=bool(col[5]),
+        )
+        for col in conn.execute(f"PRAGMA table_info({quoted})").fetchall()
+    ]
+    foreign_keys = [
+        f"{fk[3]} -> {fk[2]}({fk[4]})"
+        for fk in conn.execute(f"PRAGMA foreign_key_list({quoted})").fetchall()
+    ]
+    (row_count,) = conn.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
+    return TableInfo(
+        name=table,
+        description=TABLE_DESCRIPTIONS.get(table),
+        row_count=int(row_count),
+        columns=columns,
+        foreign_keys=foreign_keys,
+    )
+
+
+def schema_tables(db_path: str) -> list[TableInfo]:
+    """Structured schema for the /schema endpoint: tables, columns, types, notes, row counts."""
+    conn = _open_readonly(db_path)
+    try:
+        return [_table_info(conn, table) for table in _table_names(conn)]
+    finally:
+        conn.close()
 
 
 def select_schema_context(question: str, card: str) -> str:

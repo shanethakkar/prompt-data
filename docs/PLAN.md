@@ -615,4 +615,7 @@ gridlines, nice-rounded numeric scale), responsive + ARIA. Shared `niceTicks` he
 ### Parts C-H (later): BYO upload (CSV + .db, sessions, caps), cold-start warming + states, CSV
 download, shareable ?q= links, repo README, apiUrl reuse, mobile/a11y sweep.
 
-**Gate results (A+B):** *(fill in)*  backend ruff/mypy/pytest + RSS; frontend lint/tsc/build; screenshots.
+**Gate results (A+B):** (2026-06-09) backend ruff + mypy (43 files) + 99 tests (new schema test) green,
+idle RSS 5.6 MB; frontend lint/tsc/build green; screenshots confirm bar/line charts now show x/y axes
+(ticks, gridlines, nice scale, titles) and the schema drawer lists tables/columns/row-counts. Committed
++ pushed (Render/Vercel auto-redeploy). Parts C-H still pending.
