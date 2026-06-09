@@ -7,6 +7,7 @@ both render. The trust layer (assumptions, confidence) extends this in Phase 2.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -149,19 +150,25 @@ class TrustedResponse:
     confidence: Confidence | None = None
 
 
-def respond(
+def respond_events(
     question: str,
     *,
     client: LLMClient,
     settings: Settings | None = None,
     clarification_answer: str | None = None,
-) -> TrustedResponse:
-    """Full trust-layer pipeline: clarify if ambiguous, else answer with assumptions/confidence."""
+) -> Iterator[dict[str, Any]]:
+    """Run the trust pipeline, yielding stage events then a terminal clarification/answer.
+
+    Stage events ({"type":"stage","name","label"}) let the UI show the pipeline working step
+    by step. Terminal events carry the dataclass objects directly; the SSE endpoint serializes
+    them, and respond() drains this generator to build a TrustedResponse. One orchestration path.
+    """
     settings = settings or get_settings()
     schema_context, semantic_context, model = _contexts(question, settings)
 
     # Ambiguity gate, unless the user already answered a prior clarifying question.
     if not clarification_answer:
+        yield {"type": "stage", "name": "ambiguity", "label": "Checking the question for ambiguity"}
         report = detect_ambiguity(
             question,
             client=client,
@@ -170,21 +177,22 @@ def respond(
             semantic_context=semantic_context,
         )
         if report.needs_clarification:
-            return TrustedResponse(
-                question=question,
-                kind="clarification",
-                clarification=Clarification(
+            yield {
+                "type": "clarification",
+                "clarification": Clarification(
                     question=report.clarifying_question or "Could you clarify your question?",
                     options=report.options,
                     dimensions=report.dimensions,
                 ),
-            )
+            }
+            return
 
     effective_question = (
         question
         if not clarification_answer
         else f"{question}\n\nClarification: {clarification_answer}"
     )
+    yield {"type": "stage", "name": "generating", "label": "Generating and running SQL"}
     result = generate_with_self_correction(
         effective_question,
         client=client,
@@ -197,9 +205,11 @@ def respond(
     answer = _to_answer_result(question, result)
 
     if result.execution is None:
-        return TrustedResponse(question=question, kind="answer", answer=answer)
+        yield {"type": "answer", "answer": answer, "assumptions": None, "confidence": None}
+        return
 
     assumptions = extract_assumptions(result.sql)
+    yield {"type": "stage", "name": "confidence", "label": "Sampling for a confidence score"}
     agreement, k = self_consistency(
         effective_question,
         client=client,
@@ -217,10 +227,32 @@ def respond(
         retrieval_score=_RETRIEVAL_SCORE_PLACEHOLDER,
         calibration=load_calibration_map(settings.calibration_path),
     )
+    yield {"type": "answer", "answer": answer, "assumptions": assumptions, "confidence": confidence}
+
+
+def respond(
+    question: str,
+    *,
+    client: LLMClient,
+    settings: Settings | None = None,
+    clarification_answer: str | None = None,
+) -> TrustedResponse:
+    """Drain respond_events into a single TrustedResponse (non-streaming callers)."""
+    terminal: dict[str, Any] = {}
+    for event in respond_events(
+        question, client=client, settings=settings, clarification_answer=clarification_answer
+    ):
+        if event["type"] in ("clarification", "answer"):
+            terminal = event
+
+    if terminal.get("type") == "clarification":
+        return TrustedResponse(
+            question=question, kind="clarification", clarification=terminal["clarification"]
+        )
     return TrustedResponse(
         question=question,
         kind="answer",
-        answer=answer,
-        assumptions=assumptions,
-        confidence=confidence,
+        answer=terminal.get("answer"),
+        assumptions=terminal.get("assumptions"),
+        confidence=terminal.get("confidence"),
     )
