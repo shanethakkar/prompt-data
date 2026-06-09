@@ -13,7 +13,7 @@ comes next. Full spec: docs/SPEC.md.
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
-| 1 | Core text-to-SQL | **Code-complete** (offline gates green; live smoke pending API key) |
+| 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
 | 2 | Trust layer | Not started |
 | 3 | Eval harness | Not started |
 | 4 | Frontend core | Not started |
@@ -235,8 +235,16 @@ cleanly in fixture teardown.
 - [x] `uv run ruff check backend/ data/ eval/` — clean
 - [x] `uv run mypy backend/` — clean (strict, 21 files)
 - [x] `uv run pytest backend/tests/ -q` — 52 passed, idle RSS still **5.6 MB**
-- [ ] Live CLI smoke against the Anthropic API — **PENDING**: no `ANTHROPIC_API_KEY`
-  configured (no `.env`). Cannot run without a key; results will not be fabricated.
+- [x] Live CLI smoke against the Anthropic API (claude-sonnet-4-6) — **5/5 correct,
+  all on the first attempt** (no self-correction, no timeouts):
+  - "top 5 product categories by revenue" -> joins through the translation table,
+    `SUM(price)` excluding freight (semantic layer), bar. Top: health_beauty 1,258,681.34.
+  - "how many orders were delivered" -> `COUNT(DISTINCT order_id) WHERE order_status='delivered'`,
+    stat. **96,478**.
+  - "average review score by product category" -> 4-way join, 74 rows, bar.
+  - "orders per month in 2017" -> STRFTIME month + `COUNT(DISTINCT order_id)`, 12 rows, line
+    (Nov spike 7,544).
+  - "top 10 sellers by revenue" -> `SUM(price)` per seller, bar.
 
 **What shipped:**
 - `config.py` (env settings), `llm.py` (LLMClient protocol + AnthropicClient adapter using
@@ -252,8 +260,12 @@ cleanly in fixture teardown.
 - anthropic 0.107.1 has `messages.parse(output_format=Model)`; result via `.parsed_output`
 - Server does not import the SDK at startup (lazy import in `build_client`), so idle RSS holds at 5.6 MB
 
-**Remaining to close Phase 1:** run the live smoke once a key is available, record the
-generated SQL / row counts / any self-correction here, then mark complete.
+**Live smoke observations (carry into Phase 2/3):**
+- Sonnet 4.6 used the semantic layer correctly without prompting per-question, and
+  reached for the translation table and STRFTIME unaided.
+- Zero self-correction across 5 questions: the cap-2 repair loop is in place but the
+  Olist happy-path rarely exercises it. Phase 3 (BIRD) will stress it.
+- The sqlglot round-trip re-emit caused no observed query mangling on these (no named-column CTEs).
 
 ---
 
