@@ -1,4 +1,4 @@
-# Verity — Active Build Plan
+# Prompt Data — Active Build Plan
 
 This file is the living build plan. Update it at the start and end of every phase:
 mark the phase complete, record the verified gate results, and expand the next
@@ -530,16 +530,16 @@ All four are static (no backend) -> Vercel-ready ahead of Phase 6.
       /gallery contrast cards, /methodology + /limitations. Numbers match the committed JSON.
 
 ### Decisions (locked)
-- /gallery: capture REAL baseline-vs-Verity outputs via `eval/run_gallery.py` -> `gallery.json` (I run it, ~$1-1.5).
+- /gallery: capture REAL baseline-vs-Prompt Data outputs via `eval/run_gallery.py` -> `gallery.json` (I run it, ~$1-1.5).
 - /methodology + /limitations: recruiter-friendly authored TSX (NOT the raw docs/*.md); numbers imported from committed JSON.
 - Data: committed `frontend/content/*.json` (copies), refreshed by a sync script on predev/prebuild (Vercel-safe).
-- Honest framing: trap result (baseline 100% -> Verity 41%, 59pp) is the headline; BIRD = accuracy + calibration (ECE 0.44->0.15), caveated with N.
+- Honest framing: trap result (baseline 100% -> Prompt Data 41%, 59pp) is the headline; BIRD = accuracy + calibration (ECE 0.44->0.15), caveated with N.
 
 ### Parts
 - A: `eval/run_gallery.py` (~12 curated questions: traps + 1-2 hard answerable; baseline + respond()) -> `gallery.json`; `test_gallery.py` mocked.
 - B: `frontend/scripts/sync-content.mjs`; committed `frontend/content/{eval_results,trap_results,gallery}.json`; `lib/eval-types.ts`; predev/prebuild hooks.
 - C: `/evals` static page + `components/evals/*` (metric cards, signature ablation bars, reliability diagram, calibration before/after, trap by-category, clarification P/R, cost/latency) reusing Phase 4 SVG primitives.
-- D: `/gallery` static page + `components/gallery/*` (naive vs Verity cards, category filter) reusing `components/ask/*` + `charts/*`.
+- D: `/gallery` static page + `components/gallery/*` (naive vs Prompt Data cards, category filter) reusing `components/ask/*` + `charts/*`.
 - E: `/methodology` + `/limitations` authored TSX, numbers from `content/*.json`.
 - F: nav links in `app/layout.tsx` (Ask, Gallery, Evals, Methodology, Limitations), active-route styling.
 

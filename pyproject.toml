@@ -1,5 +1,5 @@
 [project]
-name = "verity"
+name = "prompt-data"
 version = "0.1.0"
 description = "Trust-layer natural-language-to-SQL analytics copilot"
 requires-python = ">=3.12"

@@ -34,7 +34,7 @@ export default function AskPage() {
               <span className="text-primary">Trust the answer.</span>
             </h1>
             <p className="mt-3 max-w-xl text-pretty text-[15px] leading-relaxed text-muted-foreground">
-              Verity turns questions about the Olist e-commerce database into SQL, surfaces the
+              Prompt Data turns questions about the Olist e-commerce database into SQL, surfaces the
               assumptions it made, asks when a question is ambiguous instead of guessing, and
               attaches a calibrated confidence signal.
             </p>

@@ -1,7 +1,7 @@
 """Capture the /gallery contrast cards (offline, paid).
 
 For each curated question, run BOTH pipelines over the Olist demo DB and store the
-real outputs: the no-trust baseline (its actual SQL + result or error) and Verity
+real outputs: the no-trust baseline (its actual SQL + result or error) and Prompt Data
 (its clarification, or its answer with assumptions and calibrated confidence). Same
 model, trust off vs on. Writes the committed eval/out/gallery.json the frontend renders.
 
@@ -106,7 +106,7 @@ def capture_card(
     item: dict[str, str], *, client: LLMClient, model: str, settings: Settings
 ) -> dict[str, Any]:
     schema_context = build_schema_card(settings.demo_db_path)
-    _ = render_semantic_layer()  # Verity uses it internally via respond()
+    _ = render_semantic_layer()  # Prompt Data uses it internally via respond()
     naive = _naive(
         item["question"],
         client=client,

@@ -1,4 +1,4 @@
-"""Read-only, SELECT-only SQL execution sandbox for Verity.
+"""Read-only, SELECT-only SQL execution sandbox for Prompt Data.
 
 This module is the prompt-injection backstop. Regardless of what the LLM emits,
 only a single read-only SELECT ever reaches the database. The security model is

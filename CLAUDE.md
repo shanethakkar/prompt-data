@@ -1,4 +1,4 @@
-# Verity — Trust-Layer Analytics Copilot
+# Prompt Data — Trust-Layer Analytics Copilot
 
 Natural-language-to-SQL over the Olist e-commerce DB. The product is TRUST, not
 query generation: ambiguity detection, surfaced assumptions, calibrated

@@ -98,7 +98,7 @@ export function GalleryCard({ card }: { card: Card }) {
           )}
         </Pane>
 
-        <Pane tone="verity" label="Verity" tag="trust layer on">
+        <Pane tone="verity" label="Prompt Data" tag="trust layer on">
           {v.kind === "clarification" && v.clarification ? (
             <div className="flex flex-col gap-2.5">
               <p className="text-sm text-foreground">{v.clarification.question}</p>

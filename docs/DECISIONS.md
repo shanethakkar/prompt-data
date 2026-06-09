@@ -1,4 +1,4 @@
-# Verity — Decisions and Findings
+# Prompt Data — Decisions and Findings
 
 Lightweight record of non-obvious implementation discoveries, API quirks, and
 architectural choices made during the build. Each entry explains the context,

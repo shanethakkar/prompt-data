@@ -1,6 +1,6 @@
-# Verity — Trust-Layer Analytics Copilot
+# Prompt Data — Trust-Layer Analytics Copilot
 
-> Working name: **Verity**. Rename in one place (CLAUDE.md product line and the frontend brand token) if you want something else.
+> Working name: **Prompt Data**. Rename in one place (CLAUDE.md product line and the frontend brand token) if you want something else.
 
 This is the build specification. It is written to be read by Claude Code. Put it at `docs/SPEC.md` and reference it from `CLAUDE.md`. Build it phase by phase. Do not skip the trust layer or the eval harness; they are the entire point of the project.
 
@@ -8,9 +8,9 @@ This is the build specification. It is written to be read by Claude Code. Put it
 
 ## 1. North star
 
-Verity is a natural-language-to-SQL analytics copilot whose differentiator is **trust**, not query generation. Generating SQL is a solved, crowded category. What is not solved is making the answer trustworthy for a non-technical user: knowing when a question is ambiguous, stating the assumptions made, attaching a calibrated confidence signal, and measuring how often the system is *confidently wrong*.
+Prompt Data is a natural-language-to-SQL analytics copilot whose differentiator is **trust**, not query generation. Generating SQL is a solved, crowded category. What is not solved is making the answer trustworthy for a non-technical user: knowing when a question is ambiguous, stating the assumptions made, attaching a calibrated confidence signal, and measuring how often the system is *confidently wrong*.
 
-A user asks a question in plain English about the Olist e-commerce database. Verity either answers, with the SQL, the assumptions it made, a confidence signal, and the grounding rows, or it asks a clarifying question instead of guessing. Every claim Verity makes about its own quality is backed by a reproducible benchmark, never asserted.
+A user asks a question in plain English about the Olist e-commerce database. Prompt Data either answers, with the SQL, the assumptions it made, a confidence signal, and the grounding rows, or it asks a clarifying question instead of guessing. Every claim Prompt Data makes about its own quality is backed by a reproducible benchmark, never asserted.
 
 The build is finished when three artifacts exist and are deployed:
 1. A polished frontend a recruiter can click through in 60 seconds.
@@ -25,7 +25,7 @@ Every feature serves one of these four trust behaviors. If a proposed feature do
 
 1. **Ambiguity detection.** Detect underspecified questions and ask a clarifying question instead of guessing. Do not over-ask on clear questions.
 2. **Assumption surfacing.** When proceeding without clarifying, state the concrete assumptions made: which column maps to which business term, the time grain, the filters applied.
-3. **Calibrated confidence.** Produce a confidence score that actually tracks correctness. When Verity says 85% confident, it should be right about 85% of the time.
+3. **Calibrated confidence.** Produce a confidence score that actually tracks correctness. When Prompt Data says 85% confident, it should be right about 85% of the time.
 4. **Measured honesty.** Quantify the *semantic-error rate*, queries that execute successfully but answer the wrong question, and show how the trust layer reduces the confidently-wrong subset.
 
 ---
@@ -123,7 +123,7 @@ Backend and eval share no live state. The eval `out/` JSON is the only thing the
 
 **Clarifying questions.** When triggered, generate one concrete, minimal clarifying question with selectable options where possible, for example "by total revenue or by number of orders" and "calendar or fiscal quarter." The frontend renders these as tappable chips that feed the answer back into the pipeline.
 
-**Assumption surfacing (`assumptions.py`).** When Verity proceeds, extract the concrete assumptions it made as a structured object: term-to-column mappings, time grain, filters, and the join path. Rendered explicitly in the UI.
+**Assumption surfacing (`assumptions.py`).** When Prompt Data proceeds, extract the concrete assumptions it made as a structured object: term-to-column mappings, time grain, filters, and the join path. Rendered explicitly in the UI.
 
 **Confidence via self-consistency (`confidence.py`).** Sample K generations at nonzero temperature, K around 5. Execute or canonicalize each and measure agreement of the result sets. Agreement fraction, combined with whether self-correction fired and the retrieval score, forms a raw confidence. Then apply a **calibration map** fit offline by `eval/calibrate.py` (isotonic regression on a held-out BIRD split) so the displayed confidence tracks observed accuracy. The server loads the static calibration map; it does not fit anything at request time.
 
@@ -140,7 +140,7 @@ Match the existing portfolio design language for brand consistency: dark theme o
 - When the pipeline asks for clarification, render the clarifying question with tappable option chips instead of an answer card.
 - Stream the response; show meaningful loading states per stage rather than one spinner.
 
-**/gallery (trap questions, the killer demo).** A curated showcase of the questions that break naive copilots, each rendered as a side-by-side contrast: a "naive copilot" pane that produces a plausible but wrong answer, and the Verity pane that catches it. Categories to cover, roughly eight to twelve cards total: ambiguous metric, relative or ambiguous time window, an unanswerable question whose column does not exist, a hard multi-join, an aggregation-grain trap, a prompt-injection attempt, and an entity-ambiguity case. Each card documents the behavior; the naive outputs are precomputed and stored, not generated live.
+**/gallery (trap questions, the killer demo).** A curated showcase of the questions that break naive copilots, each rendered as a side-by-side contrast: a "naive copilot" pane that produces a plausible but wrong answer, and the Prompt Data pane that catches it. Categories to cover, roughly eight to twelve cards total: ambiguous metric, relative or ambiguous time window, an unanswerable question whose column does not exist, a hard multi-join, an aggregation-grain trap, a prompt-injection attempt, and an entity-ambiguity case. Each card documents the behavior; the naive outputs are precomputed and stored, not generated live.
 
 **/evals (dashboard).** Renders real metrics from `eval/out/`.
 - Metric cards: execution accuracy on BIRD, semantic-error rate, confidently-wrong rate, calibration error.
@@ -151,7 +151,7 @@ Match the existing portfolio design language for brand consistency: dark theme o
 
 **/methodology.** Long-form writeup rendered from `docs/methodology.md`, audit-defensible, explaining each trust behavior, the eval design, and how the calibration map is fit.
 
-**/limitations.** Rendered from `docs/limitations.md`. The honest page: failure classes Verity cannot catch, where confidence is least calibrated, the semantic errors that still slip through, and the known ambiguity false-negatives.
+**/limitations.** Rendered from `docs/limitations.md`. The honest page: failure classes Prompt Data cannot catch, where confidence is least calibrated, the semantic errors that still slip through, and the known ambiguity false-negatives.
 
 **/connect (optional, staged to Phase 6).** Upload a SQLite file or enter a read-only connection string, preview the inferred schema card, then ask questions against it. Showcases schema robustness on input the system has not seen.
 
@@ -214,7 +214,7 @@ These become the resume bullets. Phrase them as the trust-layer wins, for exampl
 Create this at the repo root. Keep it under 200 lines. Refine as the build proceeds.
 
 ```markdown
-# Verity — Trust-Layer Analytics Copilot
+# Prompt Data — Trust-Layer Analytics Copilot
 
 Natural-language-to-SQL over the Olist e-commerce DB. The product is TRUST, not
 query generation: ambiguity detection, surfaced assumptions, calibrated

@@ -83,7 +83,7 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Verity palette: near-black canvas (#0c0c0e), warm off-white text, single cyan accent
+/* Prompt Data palette: near-black canvas (#0c0c0e), warm off-white text, single cyan accent
    (#22d3ee). Dark is the only theme; values are OKLCH. */
 .dark {
   --background: oklch(0.15 0.006 277);

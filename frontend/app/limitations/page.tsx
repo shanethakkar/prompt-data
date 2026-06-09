@@ -5,8 +5,8 @@ import type { EvalResults, TrapResults } from "@/lib/eval-types";
 import { PageHeader } from "@/components/site/page-header";
 
 export const metadata: Metadata = {
-  title: "Limitations — Verity",
-  description: "The honest page: what Verity cannot do, where it is weakest, and what is still measured but imperfect.",
+  title: "Limitations — Prompt Data",
+  description: "The honest page: what Prompt Data cannot do, where it is weakest, and what is still measured but imperfect.",
 };
 
 const evals = evalRaw as unknown as EvalResults;
@@ -29,7 +29,7 @@ export default function LimitationsPage() {
       <PageHeader
         eyebrow="The honest page"
         title="Limitations"
-        lede="A trust product that hides its weaknesses is not trustworthy. Here is what Verity does not do well, stated plainly."
+        lede="A trust product that hides its weaknesses is not trustworthy. Here is what Prompt Data does not do well, stated plainly."
       />
 
       <Limit title="It can still be confidently wrong">

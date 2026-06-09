@@ -103,7 +103,7 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    parser = argparse.ArgumentParser(description="Ask Verity a question about the Olist DB.")
+    parser = argparse.ArgumentParser(description="Ask Prompt Data a question about the Olist DB.")
     parser.add_argument("question", help="Natural-language question")
     parser.add_argument("--db", default=None, help="Override the demo DB path")
     parser.add_argument("--clarify", default=None, help="Answer to a prior clarifying question")

@@ -11,9 +11,9 @@ const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Verity — Trust-Layer Analytics Copilot",
+  title: "Prompt Data — Trust-Layer Analytics Copilot",
   description:
-    "Ask the Olist e-commerce database in plain English. Verity surfaces its assumptions, "
+    "Ask the Olist e-commerce database in plain English. Prompt Data surfaces its assumptions, "
     + "asks when a question is ambiguous, and attaches a calibrated confidence signal.",
 };
 
@@ -27,7 +27,7 @@ function SiteHeader() {
             aria-hidden
           />
           <span className="font-mono text-sm font-medium tracking-[0.18em] text-foreground">
-            VERITY
+            PROMPT DATA
           </span>
         </Link>
         <Nav />

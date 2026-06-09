@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/site/page-header";
 import { MetricCard, PercentBars, ReliabilityDiagram } from "@/components/evals/charts";
 
 export const metadata: Metadata = {
-  title: "Evals — Verity",
+  title: "Evals — Prompt Data",
   description: "Measured trust metrics: accuracy, calibration, and the confidently-wrong reduction.",
 };
 
@@ -64,12 +64,12 @@ export default function EvalsPage() {
 
       <Section
         title="The trust layer's signature: confidently-wrong reduction"
-        caption={`On ${cw.n_traps} questions that should not be answered (ambiguous, unanswerable, prompt-injection), a no-trust baseline answers confidently every time. Verity declines or clarifies most, and over-declines none of the ${cw.n_clear} clear controls.`}
+        caption={`On ${cw.n_traps} questions that should not be answered (ambiguous, unanswerable, prompt-injection), a no-trust baseline answers confidently every time. Prompt Data declines or clarifies most, and over-declines none of the ${cw.n_clear} clear controls.`}
       >
         <PercentBars
           bars={[
             { label: "Baseline (no trust)", value: cw.baseline_confidently_answered, tone: "warn" },
-            { label: "Verity", value: cw.trust_confidently_answered, tone: "primary" },
+            { label: "Prompt Data", value: cw.trust_confidently_answered, tone: "primary" },
             { label: "Over-decline (clear)", value: cw.over_decline_rate, tone: "muted" },
           ]}
         />
@@ -97,7 +97,7 @@ export default function EvalsPage() {
 
       <Section
         title="Where the trust layer still slips"
-        caption="Share of trap questions Verity answered anyway, by category. Honest: it is strong on metric and time ambiguity, weaker on grain and entity, and the ambiguity gate is not an injection detector (the SELECT-only validator handles that)."
+        caption="Share of trap questions Prompt Data answered anyway, by category. Honest: it is strong on metric and time ambiguity, weaker on grain and entity, and the ambiguity gate is not an injection detector (the SELECT-only validator handles that)."
       >
         <PercentBars bars={catBars} />
       </Section>

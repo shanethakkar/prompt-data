@@ -62,7 +62,7 @@ def test_capture_card_clarified(gallery_settings: Settings) -> None:
         model="claude-sonnet-4-6",
         settings=gallery_settings,
     )
-    # Naive answers the ambiguous question; Verity declines and asks.
+    # Naive answers the ambiguous question; Prompt Data declines and asks.
     assert card["naive"]["error"] is None
     assert card["verity"]["kind"] == "clarification"
     assert card["verity"]["clarification"]["options"] == ["a", "b"]

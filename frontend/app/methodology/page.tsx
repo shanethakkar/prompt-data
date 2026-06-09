@@ -6,8 +6,8 @@ import type { EvalResults, TrapResults } from "@/lib/eval-types";
 import { PageHeader } from "@/components/site/page-header";
 
 export const metadata: Metadata = {
-  title: "Methodology — Verity",
-  description: "How Verity earns trust: ambiguity detection, surfaced assumptions, calibrated confidence, and measured honesty.",
+  title: "Methodology — Prompt Data",
+  description: "How Prompt Data earns trust: ambiguity detection, surfaced assumptions, calibrated confidence, and measured honesty.",
 };
 
 const evals = evalRaw as unknown as EvalResults;
@@ -33,12 +33,12 @@ export default function MethodologyPage() {
       <PageHeader
         eyebrow="How it works"
         title="Methodology"
-        lede="Generating SQL is the easy part. The hard part is knowing when to trust the answer. Verity is built around four behaviors, and every claim it makes about its own quality is measured, never asserted."
+        lede="Generating SQL is the easy part. The hard part is knowing when to trust the answer. Prompt Data is built around four behaviors, and every claim it makes about its own quality is measured, never asserted."
       />
 
       <Behavior n="01" title="It asks instead of guessing">
         <p>
-          Before answering, Verity classifies a question for ambiguity: an undefined metric (&ldquo;top&rdquo;
+          Before answering, Prompt Data classifies a question for ambiguity: an undefined metric (&ldquo;top&rdquo;
           by what?), a vague time window (&ldquo;last quarter&rdquo;), an unclear entity or grain, or a request
           for data that simply is not in the schema. When a question is genuinely underspecified, it returns a
           short clarifying question with tappable options instead of guessing.
@@ -53,7 +53,7 @@ export default function MethodologyPage() {
 
       <Behavior n="02" title="It shows its work">
         <p>
-          When it proceeds, Verity surfaces the concrete assumptions the query embodies, extracted directly from
+          When it proceeds, Prompt Data surfaces the concrete assumptions the query embodies, extracted directly from
           the SQL it actually ran: which tables and joins, which filters, the aggregation grain, the row cap, and
           which business terms it resolved (for example, &ldquo;revenue&rdquo; to the sum of item prices, or &ldquo;a
           customer&rdquo; to the unique customer id rather than the per-order id). These cannot drift from the query
@@ -63,11 +63,11 @@ export default function MethodologyPage() {
 
       <Behavior n="03" title="Its confidence is calibrated">
         <p>
-          Verity samples several candidate queries and measures how often they agree. On its own this signal is
+          Prompt Data samples several candidate queries and measures how often they agree. On its own this signal is
           over-confident, so a calibration map fit offline (isotonic regression on a held-out split) rescales it to
           match observed accuracy. That took calibration error from{" "}
           <strong className="text-foreground">{evals.calibration.ece_raw.toFixed(2)}</strong> down to{" "}
-          <strong className="text-foreground">{evals.calibration.ece_calibrated.toFixed(2)}</strong> — so when Verity
+          <strong className="text-foreground">{evals.calibration.ece_calibrated.toFixed(2)}</strong> — so when Prompt Data
           says it is 70% sure, it is roughly right 70% of the time. The map is fit offline and loaded statically;
           nothing is fit at request time.
         </p>
@@ -79,7 +79,7 @@ export default function MethodologyPage() {
           <Link href="/evals" className="text-primary underline-offset-4 hover:underline">eval suite</Link>{" "}
           against BIRD (a hard public text-to-SQL benchmark) and a curated trap set. The headline result: on
           questions that should not be confidently answered, a no-trust baseline answers{" "}
-          <strong className="text-foreground">{pct(cw.baseline_confidently_answered)}</strong> of them; Verity
+          <strong className="text-foreground">{pct(cw.baseline_confidently_answered)}</strong> of them; Prompt Data
           answers only <strong className="text-foreground">{pct(cw.trust_confidently_answered)}</strong> — clarifying
           or declining the rest — while still answering every clear control. Execution accuracy on the BIRD subset
           (n={evals.metadata.n_questions}) is <strong className="text-foreground">{pct(evals.accuracy.execution_accuracy)}</strong>.

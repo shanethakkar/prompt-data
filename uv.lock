@@ -1037,7 +1037,7 @@ wheels = [
 ]
 
 [[package]]
-name = "verity"
+name = "prompt-data"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -1,4 +1,4 @@
-"""Verity FastAPI application entry point.
+"""Prompt Data FastAPI application entry point.
 
 Phase 0: /health. Phase 1: /ask (non-streaming). Phase 4: /ask/stream (SSE, per-stage).
 
@@ -23,7 +23,7 @@ from backend.app.config import Settings, get_settings
 from backend.app.llm import LLMClient, get_llm_client
 from backend.app.pipeline.answer import TrustedResponse, respond, respond_events
 
-app = FastAPI(title="Verity", version="0.1.0")
+app = FastAPI(title="Prompt Data", version="0.1.0")
 
 # The frontend normally calls a same-origin /api proxy (Next rewrite); CORS is a dev fallback
 # for calling the backend origin directly. Lightweight starlette middleware (no RAM impact).
