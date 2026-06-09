@@ -19,6 +19,7 @@ comes next. Full spec: docs/SPEC.md.
 | 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
 | 5 | Showcase pages | **Complete** (4 static pages from committed JSON; Vercel-ready; screenshots reviewed) |
 | 6 | Deploy (Vercel + Render) | **Complete** (repo deploy-ready + pushed; go-live via docs/DEPLOY.md) |
+| 7 | Usability + bring-your-own-data | **In progress** (A chart axes + B schema explorer first) |
 
 ---
 
@@ -586,3 +587,32 @@ and pushed to github.com/shanethakkar/prompt-data, with a `docs/DEPLOY.md` runbo
 ### Risks (see plan file)
 slim DB >100 MB (drop review_comment_* then git-lfs); Vercel SSE proxy timeout (direct CORS);
 Render cold start (documented, $7 always-on option); /ask abuse (guard); XFF parsing behind proxy.
+
+---
+
+## Phase 7 — Usability + bring-your-own-data
+
+**Live feedback (prompt-data.vercel.app):** charts lack x/y axes; users can't see the schema so they
+don't know what to ask; no way to query their own data. Plus polish: cold-start warming, README,
+CSV export, shareable links, mobile/a11y. All backend work holds the 4 GB ceiling and the
+SELECT-only/read-only backstop. **Doing A + B first, then C-H.**
+
+### Decisions (locked)
+- Upload supports both CSV and .db; per-session, ephemeral (TTL), strict caps (Part C, later).
+- Custom datasets: semantic layer off + confidence shown uncalibrated (honest; map was fit on Olist).
+
+### Part A - chart axes (now)
+`frontend/components/charts/chart.tsx`: real axes on BarChart + LineChart (axis lines, ticks, light
+gridlines, nice-rounded numeric scale), responsive + ARIA. Shared `niceTicks` helper. StatCard unchanged.
+
+### Part B - schema explorer (now)
+- Backend: `schema_tables(db_path) -> list[TableInfo]` in `pipeline/schema.py` (structured reuse of
+  PRAGMA introspection + TABLE_DESCRIPTIONS/COLUMN_NOTES + row counts); bound `build_schema_card`
+  lru_cache. `GET /schema` in `main.py` (optional `session` param; resolves to Olist until Part C).
+- Frontend: `lib/api.ts` `apiUrl()`; shadcn Sheet; `SchemaDrawer` ("Data" trigger on /ask) listing
+  tables/columns/descriptions from `/schema`.
+
+### Parts C-H (later): BYO upload (CSV + .db, sessions, caps), cold-start warming + states, CSV
+download, shareable ?q= links, repo README, apiUrl reuse, mobile/a11y sweep.
+
+**Gate results (A+B):** *(fill in)*  backend ruff/mypy/pytest + RSS; frontend lint/tsc/build; screenshots.
