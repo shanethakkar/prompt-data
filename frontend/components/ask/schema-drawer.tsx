@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Database, KeyRound, Loader2 } from "lucide-react";
-import { apiUrl } from "@/lib/api";
+import { Database, KeyRound } from "lucide-react";
+import olistSchemaRaw from "@/content/olist-schema.json";
 import type { SchemaResponse, SchemaTable } from "@/lib/schema-types";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +13,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+// The Olist schema is fixed, so it ships as a static bundle (generated from the slim demo DB,
+// see `make schema-json`). No backend call -> the drawer is instant, works during a cold start,
+// and never 404s. Uploaded datasets (Part C) will fetch /schema?session=... instead.
+const olistSchema = olistSchemaRaw as unknown as SchemaResponse;
 
 function TableBlock({ table }: { table: SchemaTable }) {
   return (
@@ -48,24 +52,8 @@ function TableBlock({ table }: { table: SchemaTable }) {
 }
 
 export function SchemaDrawer({ label = "What's in the data?" }: { label?: string }) {
-  const [open, setOpen] = useState(false);
-  const [data, setData] = useState<SchemaResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open || data) return;
-    let cancelled = false;
-    fetch(apiUrl("/schema"))
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Schema request failed (${r.status})`))))
-      .then((d: SchemaResponse) => !cancelled && setData(d))
-      .catch((e: Error) => !cancelled && setError(e.message));
-    return () => {
-      cancelled = true;
-    };
-  }, [open, data]);
-
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet>
       <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5 text-muted-foreground">
           <Database className="size-3.5" />
@@ -81,20 +69,11 @@ export function SchemaDrawer({ label = "What's in the data?" }: { label?: string
           </SheetDescription>
         </SheetHeader>
         <ScrollArea className="h-full px-4 pb-6">
-          {error ? (
-            <p className="text-sm text-muted-foreground">{error}</p>
-          ) : !data ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading schema…
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {data.tables.map((t) => (
-                <TableBlock key={t.name} table={t} />
-              ))}
-            </div>
-          )}
+          <div className="flex flex-col gap-2.5">
+            {olistSchema.tables.map((t) => (
+              <TableBlock key={t.name} table={t} />
+            ))}
+          </div>
         </ScrollArea>
       </SheetContent>
     </Sheet>

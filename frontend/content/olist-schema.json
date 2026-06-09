@@ -1,0 +1,351 @@
+{
+  "dataset": "olist",
+  "tables": [
+    {
+      "name": "customers",
+      "description": "One row per order's customer. customer_unique_id identifies the person.",
+      "row_count": 99441,
+      "columns": [
+        {
+          "name": "customer_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "customer_unique_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "customer_zip_code_prefix",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "customer_city",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "customer_state",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": []
+    },
+    {
+      "name": "order_items",
+      "description": "One row per item within an order. price and freight_value are per item.",
+      "row_count": 112650,
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "order_item_id",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "product_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "seller_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "shipping_limit_date",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "price",
+          "type": "REAL",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "freight_value",
+          "type": "REAL",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": [
+        "seller_id -> sellers(seller_id)",
+        "product_id -> products(product_id)",
+        "order_id -> orders(order_id)"
+      ]
+    },
+    {
+      "name": "order_payments",
+      "description": "Payment installments per order. One order can have several payment rows.",
+      "row_count": 103886,
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "payment_sequential",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "payment_type",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "payment_installments",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "payment_value",
+          "type": "REAL",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": [
+        "order_id -> orders(order_id)"
+      ]
+    },
+    {
+      "name": "order_reviews",
+      "description": "Customer reviews. review_id is NOT unique (some rows repeat).",
+      "row_count": 99224,
+      "columns": [
+        {
+          "name": "review_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "review_score",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "review_creation_date",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "review_answer_timestamp",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": [
+        "order_id -> orders(order_id)"
+      ]
+    },
+    {
+      "name": "orders",
+      "description": "One row per order, with status and the purchase/delivery timestamps.",
+      "row_count": 99441,
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "customer_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "order_status",
+          "type": "TEXT",
+          "note": "e.g. 'delivered', 'shipped', 'canceled'",
+          "primary_key": false
+        },
+        {
+          "name": "order_purchase_timestamp",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "order_approved_at",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "order_delivered_carrier_date",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "order_delivered_customer_date",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "order_estimated_delivery_date",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": [
+        "customer_id -> customers(customer_id)"
+      ]
+    },
+    {
+      "name": "product_category_name_translation",
+      "description": "Portuguese to English product category names.",
+      "row_count": 73,
+      "columns": [
+        {
+          "name": "product_category_name",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "product_category_name_english",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": []
+    },
+    {
+      "name": "products",
+      "description": "Product catalog. Category names are Portuguese; join the translation table.",
+      "row_count": 32951,
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "product_category_name",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "product_name_lenght",
+          "type": "INTEGER",
+          "note": "sic: misspelled in the source data",
+          "primary_key": false
+        },
+        {
+          "name": "product_description_lenght",
+          "type": "INTEGER",
+          "note": "sic: misspelled in the source data",
+          "primary_key": false
+        },
+        {
+          "name": "product_photos_qty",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "product_weight_g",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "product_length_cm",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "product_height_cm",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "product_width_cm",
+          "type": "INTEGER",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": [
+        "product_category_name -> product_category_name_translation(product_category_name)"
+      ]
+    },
+    {
+      "name": "sellers",
+      "description": "Marketplace sellers.",
+      "row_count": 3095,
+      "columns": [
+        {
+          "name": "seller_id",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": true
+        },
+        {
+          "name": "seller_zip_code_prefix",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "seller_city",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        },
+        {
+          "name": "seller_state",
+          "type": "TEXT",
+          "note": null,
+          "primary_key": false
+        }
+      ],
+      "foreign_keys": []
+    }
+  ]
+}

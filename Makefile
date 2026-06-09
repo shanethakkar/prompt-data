@@ -1,4 +1,4 @@
-.PHONY: check lint typecheck test load-db load-db-full pack-db unpack-db help
+.PHONY: check lint typecheck test load-db load-db-full pack-db unpack-db schema-json help
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -16,6 +16,9 @@ pack-db:  ## Recreate the committed data/demo.db.gz from a freshly built slim da
 
 unpack-db:  ## Decompress the committed data/demo.db.gz to data/demo.db (no raw CSVs needed)
 	gzip -dkf data/demo.db.gz
+
+schema-json:  ## Regenerate frontend/content/olist-schema.json (static schema the drawer bundles)
+	uv run python -c "import json, dataclasses; from backend.app.pipeline.schema import schema_tables; json.dump({'dataset': 'olist', 'tables': [dataclasses.asdict(t) for t in schema_tables('data/demo.db')]}, open('frontend/content/olist-schema.json', 'w'), indent=2)"
 
 test:  ## Run pytest suite
 	uv run pytest backend/tests/ -v -s
