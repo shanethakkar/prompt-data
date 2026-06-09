@@ -15,7 +15,7 @@ comes next. Full spec: docs/SPEC.md.
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
-| 3 | Eval harness | **In progress** (Sonnet/240 + calibration done; adding trap eval for the signature metric) |
+| 3 | Eval harness | **Complete** (Sonnet/240 + calibration + trap eval: 59pp confidently-wrong reduction, 0 over-decline) |
 | 4 | Frontend core | Not started |
 | 5 | Showcase pages | Not started |
 | 6 | Production and polish | Not started |
@@ -365,6 +365,15 @@ pool; re-run from the budget-shaped Haiku/100 pilot now that funds were added. ~
   - clarification (labeled set): **precision 1.00, recall 0.69, over-ask 0.0**
   - eval peak RSS **96 MB** (separate offline process, well under 4 GB)
 - [x] Server picks up the fitted map: `load_calibration_map(...).calibrated == True` (apply(1.0)=0.71)
+- [x] **Trap eval (the signature metric; Sonnet, 27 traps + 15 clear controls, ~$0.88) — `eval/out/trap_results.json`:**
+  - **baseline confidently answers 100% of traps -> trust answers 40.7%: a 59pp absolute reduction**,
+    with **0% over-decline** on clear controls (trust answered all 15)
+  - clarification P/R on genuine ambiguity: **precision 1.00, recall 0.70**
+  - by category (trust still-answered = slip-through): metric **0%**, time **0%**, unanswerable **33%**,
+    grain **67%**, entity **100%**, prompt_injection **100%**
+  - honest reading: strong on metric/time ambiguity; weak on grain/entity; the ambiguity gate does
+    NOT detect prompt injection (the SELECT-only validator is the injection backstop, and it holds).
+    Mean confidence is lower on answered traps (0.63) than clear (0.69) but only weakly separating.
 
 **Numbers are a pinned-subset Sonnet result (240 of 1534 BIRD dev), reported with N and caveated.**
 The committed `eval/out/eval_results.json` + `calibration.json` are the reproducible record.

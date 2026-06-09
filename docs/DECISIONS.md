@@ -61,6 +61,30 @@ en-dash and the default cp1252 stdout could not encode it. Separately, the no-em
 
 ---
 
+## [Phase 3] Trap eval earns the signature metric that BIRD cannot
+
+**Context:** BIRD questions are well-specified, so the clarification arm never fires and the
+confidently-wrong reduction was undemonstrated. Added a trap eval (`eval/run_traps.py`) over the
+Olist demo: 27 should-decline questions (ambiguous, unanswerable, prompt-injection) + 15 clear
+controls, running the trust pipeline vs a no-trust baseline.
+
+**Result (Sonnet 4.6):** baseline confidently answers **100%** of traps; the trust layer answers
+**40.7%** (clarifies or fails the rest) — a **59 pp** reduction — while answering **all** clear
+controls (0% over-decline). Threshold-free headline: clarification is the primary defense, so the
+metric is simply "did the layer answer a question it shouldn't have."
+
+**Honest category breakdown (where it still slips):** metric/time ambiguity caught 100%;
+unanswerable 67%; grain 33%; entity 0%; prompt_injection 0%. Two takeaways recorded in
+`docs/limitations.md`: (1) the ambiguity gate is not an injection detector — the SELECT-only
+validator is the injection backstop and it holds (no write ever executes); (2) grain/entity
+ambiguity is under-caught. Clarification P/R on genuine ambiguity: precision 1.00, recall 0.70.
+
+**Design note:** no fixed confidence threshold in the headline (calibrated confidence maxes ~0.71,
+so any 0.8 gate is meaningless). The trap eval uses the shipped calibration map for the reported
+mean-confidence figures only.
+
+---
+
 ## [Phase 3] Re-run on Sonnet exposed eval-methodology bugs; fixed before trusting numbers
 
 **Context:** Budget was raised, so Phase 3 was re-run on Sonnet 4.6 (the demo model) at K=5 over 240
