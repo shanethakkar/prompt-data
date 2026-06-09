@@ -17,9 +17,9 @@ build/
 data/demo.db
 data/raw/
 
-# Eval outputs (committed manually after a measured run)
-eval/out/eval_results.json
-eval/out/calibration.json
+# Eval outputs: eval_results.json and calibration.json ARE committed (the reproducibility
+# artifact, per SPEC Section 11). Only the partial-progress file and rendered charts are ignored.
+eval/out/results.partial.jsonl
 eval/out/charts/
 
 # Frontend

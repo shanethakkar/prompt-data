@@ -1,0 +1,32 @@
+{
+  "description": "Hand-labeled ground truth for clarification precision/recall over the Olist demo DB. ambiguous=true means a well-built copilot SHOULD ask before answering; flagging a clear question is over-asking. dimension names the primary ambiguity. Seeds the Phase 5 gallery.",
+  "db": "demo",
+  "questions": [
+    {"id": "amb-metric-1", "question": "Who are the top sellers?", "ambiguous": true, "dimension": "metric", "note": "top by revenue, order count, or review score?"},
+    {"id": "amb-metric-2", "question": "What are the best products?", "ambiguous": true, "dimension": "metric", "note": "best by sales, rating, or volume?"},
+    {"id": "amb-metric-3", "question": "Which category performs best?", "ambiguous": true, "dimension": "metric", "note": "performance undefined"},
+    {"id": "amb-time-1", "question": "How many orders were placed last quarter?", "ambiguous": true, "dimension": "time_window", "note": "no fixed quarter; data ends 2018"},
+    {"id": "amb-time-2", "question": "Show me recent revenue.", "ambiguous": true, "dimension": "time_window", "note": "'recent' has no fixed range"},
+    {"id": "amb-time-3", "question": "How have sales trended lately?", "ambiguous": true, "dimension": "time_window", "note": "'lately' undefined"},
+    {"id": "amb-grain-1", "question": "What is the average price?", "ambiguous": true, "dimension": "grain", "note": "per item, per order, or per category?"},
+    {"id": "amb-grain-2", "question": "What is the average delivery time?", "ambiguous": true, "dimension": "grain", "note": "purchase-to-carrier or purchase-to-customer?"},
+    {"id": "amb-entity-1", "question": "How many customers do we have in Sao Paulo?", "ambiguous": true, "dimension": "entity", "note": "customer state vs city; unique people vs order rows"},
+    {"id": "amb-answer-1", "question": "What is the profit margin per product?", "ambiguous": true, "dimension": "answerability", "note": "no cost data in the schema"},
+    {"id": "amb-answer-2", "question": "Which customers have churned?", "ambiguous": true, "dimension": "answerability", "note": "no churn definition or data"},
+    {"id": "amb-answer-3", "question": "What is each customer's email address?", "ambiguous": true, "dimension": "answerability", "note": "no email column exists"},
+    {"id": "amb-answer-4", "question": "What is our customer lifetime value?", "ambiguous": true, "dimension": "answerability", "note": "LTV undefined; needs assumptions not in schema"},
+
+    {"id": "clear-1", "question": "How many orders were delivered?", "ambiguous": false, "dimension": null},
+    {"id": "clear-2", "question": "How many orders are there in total?", "ambiguous": false, "dimension": null},
+    {"id": "clear-3", "question": "What is the average review score across all reviews?", "ambiguous": false, "dimension": null},
+    {"id": "clear-4", "question": "How many sellers are in the database?", "ambiguous": false, "dimension": null},
+    {"id": "clear-5", "question": "List each order status and how many orders have it.", "ambiguous": false, "dimension": null},
+    {"id": "clear-6", "question": "What are the top 5 product categories by total revenue?", "ambiguous": false, "dimension": null},
+    {"id": "clear-7", "question": "How many orders were placed in 2017?", "ambiguous": false, "dimension": null},
+    {"id": "clear-8", "question": "What is the average freight value per order item?", "ambiguous": false, "dimension": null},
+    {"id": "clear-9", "question": "How many products are in the catalog?", "ambiguous": false, "dimension": null},
+    {"id": "clear-10", "question": "How many distinct customers (by unique id) placed at least one order?", "ambiguous": false, "dimension": null},
+    {"id": "clear-11", "question": "What is the total number of order items?", "ambiguous": false, "dimension": null},
+    {"id": "clear-12", "question": "How many orders were placed each month in 2018?", "ambiguous": false, "dimension": null}
+  ]
+}

@@ -50,6 +50,10 @@ class AnthropicClient:
 
     def __init__(self, client: anthropic.Anthropic) -> None:
         self._client = client
+        # Cumulative token usage, read by the offline eval to compute cost.
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self.calls = 0
 
     def generate_structured(
         self,
@@ -69,6 +73,11 @@ class AnthropicClient:
             temperature=temperature,
             thinking={"type": "disabled"},
         )
+        usage = response.usage
+        self.input_tokens += usage.input_tokens + (usage.cache_read_input_tokens or 0)
+        self.output_tokens += usage.output_tokens
+        self.calls += 1
+
         parsed = response.parsed_output
         if parsed is None:
             raise LLMError("Model returned no parsable structured output.")
