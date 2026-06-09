@@ -12,7 +12,7 @@ comes next. Full spec: docs/SPEC.md.
 
 | Phase | Name | Status |
 |---|---|---|
-| 0 | Scaffold and safety floor | **In progress** |
+| 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
 | 1 | Core text-to-SQL | Not started |
 | 2 | Trust layer | Not started |
 | 3 | Eval harness | Not started |
@@ -28,11 +28,18 @@ comes next. Full spec: docs/SPEC.md.
 (including RSS assertion with value printed), `ruff check backend/ data/` is clean,
 `mypy backend/` is clean under strict mode.
 
-**Verified gate results:** *(fill in after implementation)*
-- [ ] `python data/load_olist.py` — OK
-- [ ] `pytest backend/tests/ -v -s` — OK, idle RSS: _____ MB
-- [ ] `ruff check backend/ data/` — clean
-- [ ] `mypy backend/` — clean
+**Verified gate results:** (2026-06-09, sqlglot 25.34.1, Python 3.12.13)
+- [x] `uv run python data/load_olist.py` — OK, FK check clean, all tables non-empty
+- [x] `uv run pytest backend/tests/ -v -s` — 31 passed, idle RSS: **5.6 MB**
+- [x] `uv run ruff check backend/ data/ eval/` — clean
+- [x] `uv run mypy backend/` — clean (strict, 8 files)
+
+**Deltas from plan (data-quality findings, see docs/DECISIONS.md):**
+- `order_reviews` is a rowid table (review_id not unique: 814 dups), indexed on review_id + order_id
+- 2 product categories seeded into the translation table so the products FK holds
+- Limit clamp reads the `expression` arg (not `this`); fails safe on non-numeric limits
+- Timeout test avoids named-column CTE aliases (sqlglot drops them on round-trip)
+- `types-psutil` added to dev deps for mypy strict
 
 ### Files to create
 

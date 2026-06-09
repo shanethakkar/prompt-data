@@ -44,6 +44,55 @@ must be in the explicit forbidden-types tuple.
 
 ---
 
+## [Phase 0] sqlglot Limit node stores its value under `expression`, not `this`
+
+**Context:** The LIMIT clamp (reduce a user-supplied `LIMIT 9999` down to 500) read the
+limit value from the wrong arg and silently never fired. A test caught it.
+
+**Finding:** For `SELECT 1 LIMIT 9999`, the AST is `Limit(expression=Literal(this=9999))`.
+The numeric value is at `limit_node.args["expression"]`, and `limit_node.args["this"]` is
+`None`. The correct access is:
+
+```python
+limit_value = existing_limit.args.get("expression")
+if isinstance(limit_value, exp.Literal) and limit_value.is_number:
+    if int(limit_value.this) > default_limit:
+        statement = statement.limit(default_limit)
+else:
+    statement = statement.limit(default_limit)   # fail safe: unknown limit -> cap
+```
+
+**Why it matters:** Without the clamp, a generated query could request an unbounded row
+count, threatening the row-cap and memory guarantees. The clamp now also fails safe: any
+limit that is not a plain numeric literal is replaced with the cap.
+
+---
+
+## [Phase 0] sqlglot round-trip DROPS named-column table aliases (e.g. `WITH r(n) AS ...`)
+
+**Context:** The validator re-emits every query via `statement.sql()` to inject the LIMIT.
+A timeout test used `WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL ...)`. After the round-trip
+the `(n)` column list was gone, sqlglot logged `WARNING ... Named columns are not supported
+in table alias`, and SQLite then failed with `no such column: n`.
+
+**Finding:** sqlglot's SQLite generator does not preserve column names declared on a table
+alias / CTE name. Define CTE columns inside the body instead:
+
+```sql
+-- dropped by round-trip:
+WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n < 1000)  SELECT ...
+-- survives round-trip:
+WITH RECURSIVE r AS (SELECT 1 AS n UNION ALL SELECT n+1 FROM r WHERE n < 1000) SELECT ...
+```
+
+**Why it matters (carry into Phase 1):** because the validator round-trips SQL through
+sqlglot, any construct sqlglot cannot faithfully regenerate will be silently altered before
+execution. Generated SQL should be canonicalized/validated against this round-trip, and the
+generation prompt should avoid named-column aliases. Watch for other lossy round-trips when
+wiring real generation.
+
+---
+
 ## [Phase 0] sqlglot `.limit()` returns a new node — do not mutate in place
 
 **Context:** LIMIT injection modifies the parsed AST before converting back to SQL.
@@ -115,4 +164,35 @@ type-checked under strict mode.
 
 **Runtime enforcement:** `backend/tests/test_server_rss.py` measures actual RSS of the
 running uvicorn process. If pandas (or any large library) is accidentally imported, the
-RSS test will catch it.
+RSS test will catch it. Measured idle RSS at Phase 0: **5.6 MB** (limit 4096 MB).
+
+---
+
+## [Phase 0] Verified row counts in demo.db (pandas-truth, not `wc -l`)
+
+`wc -l` overcounts the review and other text tables because review comments contain embedded
+newlines inside quoted fields. The real row counts after load:
+
+| table | rows |
+|---|---|
+| product_category_name_translation | 73 (71 from CSV + 2 seeded) |
+| customers | 99,441 |
+| sellers | 3,095 |
+| products | 32,951 |
+| orders | 99,441 |
+| order_items | 112,650 |
+| order_payments | 103,886 |
+| order_reviews | 99,224 |
+| geolocation | 1,000,163 |
+
+`verify()` therefore asserts only non-zero counts plus a clean `PRAGMA foreign_key_check`,
+not exact line-count matches.
+
+---
+
+## [Phase 0] `make` is not on PATH on Windows
+
+The Makefile is the canonical interface for the verification gates and works in CI and on
+Unix. On this Windows dev box `make` is not installed, so run the underlying commands the
+Makefile documents directly, e.g. `uv run pytest backend/tests/ -v -s`,
+`uv run ruff check backend/ data/`, `uv run mypy backend/`.
