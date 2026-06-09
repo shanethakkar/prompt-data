@@ -17,7 +17,7 @@ comes next. Full spec: docs/SPEC.md.
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
 | 3 | Eval harness | **Complete** (Sonnet/240 + calibration + trap eval: 59pp confidently-wrong reduction, 0 over-decline) |
 | 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
-| 5 | Showcase pages | Not started |
+| 5 | Showcase pages | **In progress** |
 | 6 | Production and polish | Not started |
 
 ---
@@ -514,12 +514,35 @@ frontend-design); respond() refactor regressing non-streaming /ask (drain same g
 
 ---
 
-## Phase 5 — Showcase pages *(expand before starting)*
+## Phase 5 — Showcase pages
 
-Deliverables: /gallery (trap questions), /evals (reading Phase 3 output), /methodology,
-/limitations.
+**Done when:** /gallery, /evals, /methodology, /limitations render; the gallery contrast and the
+dashboard metrics are real (from committed JSON); offline + frontend gates green; screenshots reviewed.
+All four are static (no backend) -> Vercel-ready ahead of Phase 6.
 
-*Expand this section at the start of Phase 5.*
+**Gate results:** *(fill in at end of phase)*
+- [ ] backend: ruff, mypy backend/ eval/, pytest (incl. test_gallery); 4 GB unaffected (offline eval)
+- [ ] paid gallery capture -> committed eval/out/gallery.json
+- [ ] frontend: npm run lint, tsc --noEmit, next build (5 routes)
+- [ ] Playwright screenshots of the four pages reviewed; numbers match committed JSON
+
+### Decisions (locked)
+- /gallery: capture REAL baseline-vs-Verity outputs via `eval/run_gallery.py` -> `gallery.json` (I run it, ~$1-1.5).
+- /methodology + /limitations: recruiter-friendly authored TSX (NOT the raw docs/*.md); numbers imported from committed JSON.
+- Data: committed `frontend/content/*.json` (copies), refreshed by a sync script on predev/prebuild (Vercel-safe).
+- Honest framing: trap result (baseline 100% -> Verity 41%, 59pp) is the headline; BIRD = accuracy + calibration (ECE 0.44->0.15), caveated with N.
+
+### Parts
+- A: `eval/run_gallery.py` (~12 curated questions: traps + 1-2 hard answerable; baseline + respond()) -> `gallery.json`; `test_gallery.py` mocked.
+- B: `frontend/scripts/sync-content.mjs`; committed `frontend/content/{eval_results,trap_results,gallery}.json`; `lib/eval-types.ts`; predev/prebuild hooks.
+- C: `/evals` static page + `components/evals/*` (metric cards, signature ablation bars, reliability diagram, calibration before/after, trap by-category, clarification P/R, cost/latency) reusing Phase 4 SVG primitives.
+- D: `/gallery` static page + `components/gallery/*` (naive vs Verity cards, category filter) reusing `components/ask/*` + `charts/*`.
+- E: `/methodology` + `/limitations` authored TSX, numbers from `content/*.json`.
+- F: nav links in `app/layout.tsx` (Ask, Gallery, Evals, Methodology, Limitations), active-route styling.
+
+### Risks (see plan file)
+Vercel build context (commit content/*.json); weak contrasts (capture ~14, feature best ~10);
+number drift (import JSON); capture cost (dry-run first, ~$1.5); dashboard overclaiming (trap headline, BIRD caveated).
 
 ---
 
