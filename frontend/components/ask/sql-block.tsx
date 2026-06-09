@@ -57,7 +57,7 @@ export function SqlBlock({ sql }: { sql: string }) {
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <pre className="overflow-x-auto px-4 py-3.5 text-[13px] leading-relaxed">
+      <pre className="max-h-80 overflow-auto px-4 py-3.5 text-[13px] leading-relaxed">
         <code className="font-mono">{highlight(sql)}</code>
       </pre>
     </div>

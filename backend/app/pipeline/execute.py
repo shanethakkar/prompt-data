@@ -141,7 +141,9 @@ def validate_and_inject(sql: str, default_limit: int = DEFAULT_LIMIT) -> str:
         else:
             statement = statement.limit(default_limit)
 
-    return statement.sql(dialect="sqlite")
+    # pretty=True formats the validated query across indented lines so the UI can show the
+    # exact executed SQL in a readable, multi-line form. SQLite runs multi-line SQL identically.
+    return statement.sql(dialect="sqlite", pretty=True)
 
 
 def _open_readonly(db_path: str) -> sqlite3.Connection:
