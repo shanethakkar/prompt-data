@@ -35,18 +35,22 @@ Eval: BIRD dev (SQLite). Not Spider 2.0 full.
 - Match the existing portfolio design: dark theme, cyan accent, Geist fonts, SVG charts.
 - Commit per phase. Run make check before every commit. Pre-commit hooks run ruff
   automatically on git commit.
-- When you discover something non-obvious (API quirk, surprising behavior, a choice
-  between real alternatives), add an entry to docs/DECISIONS.md before moving on.
+- Update docs/DECISIONS.md the moment a non-obvious finding lands (API quirk, surprising
+  behavior, a data gotcha, a choice between real alternatives). Do it as it comes in, not
+  in a batch at the end; a finding you defer is a finding you lose.
 
 ## Workflow
-- Read docs/PLAN.md before starting any work. It is the authoritative record of what
-  has been built, what phase is active, and what comes next.
-- Read docs/DECISIONS.md to pick up discoveries from prior phases before touching
-  any code they affect.
-- Start each phase in plan mode. Read docs/SPEC.md and the target phase section in
-  docs/PLAN.md, produce a plan, wait for approval, then implement.
-- Update docs/PLAN.md at the start and end of every phase: mark gates complete,
-  record RSS and other measured values, expand the next phase section.
+Per-phase order. Do NOT skip step 2: the repo's plan, not your memory, is the source of truth.
+1. Read docs/PLAN.md (authoritative state) and docs/DECISIONS.md (prior findings) before
+   touching anything. Re-read the target phase section of docs/SPEC.md.
+2. BEFORE writing any code, commit the phase plan into docs/PLAN.md: flip the phase to
+   In progress in the status table and expand that phase's section (decisions, files,
+   key designs, gate checklist). The plan must live in the repo, not only in chat or the
+   plan-mode scratch file.
+3. Start in plan mode: produce/confirm the approach, wait for approval, then implement.
+4. As findings arise mid-phase, append to docs/DECISIONS.md immediately (see Conventions).
+5. At end of phase: fill in the gate results in docs/PLAN.md (mark gates, record measured
+   values like RSS), flip status to Complete, then run make check and commit.
 - Keep this file small; link to docs/ for detail.
 
 ## Docs

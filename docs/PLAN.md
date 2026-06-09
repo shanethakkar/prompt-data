@@ -14,7 +14,7 @@ comes next. Full spec: docs/SPEC.md.
 |---|---|---|
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
-| 2 | Trust layer | Not started |
+| 2 | Trust layer | **In progress** |
 | 3 | Eval harness | Not started |
 | 4 | Frontend core | Not started |
 | 5 | Showcase pages | Not started |
@@ -269,15 +269,62 @@ cleanly in fixture teardown.
 
 ---
 
-## Phase 2 — Trust layer *(expand before starting)*
+## Phase 2 — Trust layer
 
-Deliverables: ambiguity detection and clarifying questions, assumption extraction,
-self-consistency confidence, placeholder calibration map.
+**Done when:** an ambiguous question returns a clarifying question with options, and a clear
+question returns an answer plus a structured assumptions panel and a (provisional) confidence
+score, end-to-end via CLI and `/ask`, with offline gates green and a recorded live smoke.
 
-Done when: an ambiguous question triggers a clarifying question; a clear one returns
-assumptions and a confidence signal.
+**Gate results:** *(fill in at end of phase)*
+- [ ] `uv run ruff check backend/ data/ eval/` — clean
+- [ ] `uv run mypy backend/` — clean (strict)
+- [ ] `uv run pytest backend/tests/ -q` — all pass, idle RSS recorded
+- [ ] Live smoke: clear -> answer+assumptions+confidence; ambiguous -> clarification; clarify follow-up
 
-*Expand this section at the start of Phase 2.*
+### Decisions (locked)
+- Assumptions: deterministic from the executed SQL via sqlglot (tables, joins, filters, grain,
+  LIMIT) + matched semantic-layer terms. No extra LLM call.
+- Answer selection: displayed answer is the temp-0 generation (reproducible); K-1 temp>0 samples
+  vote only for the agreement fraction.
+- Confidence: shown, labeled provisional (`calibrated=False`) until Phase 3 fits the isotonic map.
+- K (self-consistency samples): default 5, configurable.
+
+### Files to create
+```
+backend/app/pipeline/ambiguity.py     # AmbiguityReport + detect_ambiguity (clarify or proceed)
+backend/app/pipeline/assumptions.py   # pure: sqlglot SQL -> Assumptions
+backend/app/pipeline/confidence.py    # self-consistency, canonicalize_rows, calibration seam
+backend/tests/test_ambiguity.py
+backend/tests/test_assumptions.py
+backend/tests/test_confidence.py
+```
+
+### Files to modify
+```
+backend/app/config.py        # self_consistency_samples (5), _temperature (0.7), calibration_path
+backend/app/pipeline/answer.py   # respond() + Clarification/Assumptions/Confidence/TrustedResponse
+backend/app/main.py          # /ask returns TrustedResponse (kind-based) + clarification_answer field
+backend/app/cli.py           # render clarification vs answer + assumptions + provisional confidence
+backend/tests/conftest.py    # FakeLLMClient type-aware (match output_format); new Settings fields
+backend/tests/test_answer.py # extend: respond clear/clarify paths + /ask shapes
+```
+
+### Key designs
+- `respond(question, *, client, settings, clarification_answer=None)`: detect_ambiguity ->
+  if needs_clarification and no clarification_answer, return `kind="clarification"`; else run the
+  Phase 1 temp-0 `generate_with_self_correction` (primary/displayed answer), extract assumptions
+  from `primary.sql`, run self-consistency for agreement, compute confidence. Returns a
+  `kind`-based `TrustedResponse`.
+- raw confidence = `agreement * (0.85 if self_correction_fired else 1.0) * retrieval_score`
+  (retrieval_score placeholder 1.0; Phase 3 supplies the real value). `calibrated=False` until
+  `load_calibration_map` finds a real map at `calibration_path`.
+- `canonicalize_rows` (sort rows, round floats) lives in confidence.py; Phase 3 `eval/metrics.py`
+  reuses it.
+
+### Risks (see plan file for full table)
+Over-asking (conservative prompt; measured Phase 3); K-call cost (prompt caching + Phase 6 Haiku
+routing); float-noise agreement (canonicalize); term-match heuristic (structural parts exact);
+confidence not a measured metric (provisional label, no claims until Phase 3).
 
 ---
 
