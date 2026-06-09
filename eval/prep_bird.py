@@ -21,7 +21,7 @@ DATABASES_ZIP = BIRD_DIR / "dev_databases.zip"
 DATABASES_DIR = BIRD_DIR / "dev_databases"
 SUBSET_PATH = Path(__file__).parent / "bird_subset.json"
 
-SUBSET_SIZE = 100
+SUBSET_SIZE = 300
 SEED = 20260609
 
 

@@ -20,6 +20,7 @@ data/raw/
 # Eval outputs: eval_results.json and calibration.json ARE committed (the reproducibility
 # artifact, per SPEC Section 11). Only the partial-progress file and rendered charts are ignored.
 eval/out/results.partial.jsonl
+eval/out/labeled_results.json
 eval/out/*.log
 eval/out/charts/
 

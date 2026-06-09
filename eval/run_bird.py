@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import random
 import sqlite3
 import time
 from collections import defaultdict
@@ -64,6 +65,7 @@ LABELED_PATH = Path(__file__).parent / "labeled_ambiguity.json"
 OUT_DIR = Path(__file__).parent / "out"
 PARTIAL_PATH = OUT_DIR / "results.partial.jsonl"
 RESULTS_PATH = OUT_DIR / "eval_results.json"
+LABELED_RESULTS_PATH = OUT_DIR / "labeled_results.json"
 
 # Large enough that gold and predicted sets are compared in full, not truncated.
 EVAL_ROW_CAP = 10000
@@ -313,20 +315,46 @@ def _run_clarification_pass(
     return out
 
 
+CALIBRATION_SPLIT_SEED = 20260609
+
+
 def _aggregate(
     records: list[EvalRecord], labeled: list[LabeledResult], model: str, k: int, cost: float
 ) -> dict[str, Any]:
-    answered = [r for r in records if not r["clarified"] and r["confidence_score"] is not None]
-    confs = [r["confidence_score"] for r in answered if r["confidence_score"] is not None]
-    correct = [r["correct"] for r in answered if r["confidence_score"] is not None]
+    # Calibration works from RAW confidence (the runtime confidence_score may have been
+    # computed against an evolving map and is not consistent across a resumed run).
+    answered = [r for r in records if not r["clarified"] and r["confidence_raw"] is not None]
 
-    # Calibration: split answered records into train/test, fit on train, evaluate on test.
-    split = int(len(confs) * (1 - TEST_FRACTION))
-    train_c, train_y = confs[:split], correct[:split]
-    test_c, test_y = confs[split:], correct[split:]
-    xs, ys = isotonic_fit(train_c, train_y)
+    # Randomize the train/test split: records arrive grouped by database, so a sequential
+    # split would fit on some DBs and test on others (distribution shift).
+    shuffled = answered[:]
+    random.Random(CALIBRATION_SPLIT_SEED).shuffle(shuffled)
+    raws = [float(r["confidence_raw"]) for r in shuffled if r["confidence_raw"] is not None]
+    ys_correct = [r["correct"] for r in shuffled if r["confidence_raw"] is not None]
+
+    split = int(len(raws) * (1 - TEST_FRACTION))
+    train_r, train_y = raws[:split], ys_correct[:split]
+    test_r, test_y = raws[split:], ys_correct[split:]
+    xs, ys = isotonic_fit(train_r, train_y)
     cmap = build_map(xs, ys)
-    test_calibrated = [cmap.apply(c) for c in test_c]
+    test_cal = [cmap.apply(c) for c in test_r]
+
+    ece_raw = expected_calibration_error(test_r, test_y)
+    ece_cal = expected_calibration_error(test_cal, test_y)
+    brier_raw = brier_score(test_r, test_y)
+    brier_cal = brier_score(test_cal, test_y)
+    # Only ship the isotonic map if it actually improves calibration on held-out data;
+    # otherwise keep raw confidence (identity), so we never make the live signal worse.
+    shipped = len(xs) >= 2 and ece_cal < ece_raw
+
+    # Set each answered record's confidence_score to what we would actually ship.
+    for r in records:
+        raw = r["confidence_raw"]
+        if raw is not None:
+            r["confidence_score"] = cmap.apply(raw) if shipped else raw
+
+    shipped_scores = [r["confidence_score"] for r in answered if r["confidence_score"] is not None]
+    shipped_correct = [r["correct"] for r in answered if r["confidence_score"] is not None]
 
     clar = clarification_precision_recall(labeled)
     abl = compute_ablation(records)
@@ -347,22 +375,38 @@ def _aggregate(
             "semantic_error_rate": semantic_error_rate(records),
         },
         "confidently_wrong": {
+            "note": (
+                "Reduction reflects both clarification and calibrated-confidence gating. "
+                "On BIRD the questions are well-specified so clarification_rate is ~0; the "
+                "gating comes from confidence. Read alongside the threshold sweep."
+            ),
             "threshold": CONFIDENT_THRESHOLD,
             "with_trust": confidently_wrong_rate(records),
             "baseline": baseline_confidently_wrong_rate(records),
             "absolute_reduction": abl.absolute_reduction,
             "relative_reduction": abl.relative_reduction,
+            "sweep": {
+                str(t): {
+                    "with_trust": confidently_wrong_rate(records, t),
+                    "baseline": baseline_confidently_wrong_rate(records),
+                }
+                for t in (0.6, 0.7, 0.8, 0.9)
+            },
         },
         "calibration": {
-            "test_n": len(test_c),
-            "brier_raw": brier_score(test_c, test_y),
-            "brier_calibrated": brier_score(test_calibrated, test_y),
-            "ece_raw": expected_calibration_error(test_c, test_y),
-            "ece_calibrated": expected_calibration_error(test_calibrated, test_y),
-            "reliability_raw": [dataclasses.asdict(b) for b in reliability_bins(confs, correct)],
+            "shipped_isotonic": shipped,
+            "test_n": len(test_r),
+            "brier_raw": brier_raw,
+            "brier_calibrated": brier_cal,
+            "ece_raw": ece_raw,
+            "ece_calibrated": ece_cal,
+            "reliability_shipped": [
+                dataclasses.asdict(b) for b in reliability_bins(shipped_scores, shipped_correct)
+            ],
         },
         "clarification": dataclasses.asdict(clar),
-        "calibration_map": {"x": xs, "y": ys},
+        # Empty map when not shipped -> write_calibration_map writes the identity placeholder.
+        "calibration_map": {"x": xs if shipped else [], "y": ys if shipped else []},
         "records": records,
     }
 
@@ -374,48 +418,74 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--max-cost", type=float, default=None)
     parser.add_argument("--dry-run", action="store_true", help="No API calls (stub client).")
+    parser.add_argument(
+        "--reaggregate",
+        action="store_true",
+        help="Recompute metrics from saved records + labeled results; no API calls.",
+    )
+    parser.add_argument(
+        "--cost",
+        type=float,
+        default=None,
+        help="Override the recorded total API cost (per-process tracking under-counts a resume).",
+    )
     args = parser.parse_args()
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    subset = json.loads(SUBSET_PATH.read_text(encoding="utf-8"))
-    questions: list[dict[str, Any]] = sorted(
-        subset["questions"], key=lambda q: int(q["question_id"])
-    )
-    if args.limit is not None:
-        questions = questions[: args.limit]
-
-    done = _load_done_ids()
-    pending = [q for q in questions if int(q["question_id"]) not in done]
-    print(f"{len(questions)} subset questions; {len(done)} already done; {len(pending)} to run.")
-
     settings = dataclasses.replace(
         get_settings(), self_consistency_samples=args.k, generation_model=args.model
     )
-    client: LLMClient = DryRunClient() if args.dry_run else build_client()
 
-    with PARTIAL_PATH.open("a", encoding="utf-8") as partial:
-
-        def persist(record: EvalRecord) -> None:
-            partial.write(json.dumps(record) + "\n")
-            partial.flush()
-
-        run_subset(
-            pending,
-            client=client,
-            model=args.model,
-            settings=settings,
-            max_cost=args.max_cost,
-            on_record=persist,
+    if args.reaggregate:
+        # Pure recompute from saved artifacts: no eval, no clarification API calls.
+        labeled = [
+            LabeledResult(ambiguous=bool(x["ambiguous"]), flagged=bool(x["flagged"]))
+            for x in json.loads(LABELED_RESULTS_PATH.read_text(encoding="utf-8"))
+        ]
+        prior = (
+            json.loads(RESULTS_PATH.read_text(encoding="utf-8")) if RESULTS_PATH.exists() else {}
         )
+        cost = float(prior.get("metadata", {}).get("estimated_cost_usd", 0.0))
+    else:
+        subset = json.loads(SUBSET_PATH.read_text(encoding="utf-8"))
+        questions: list[dict[str, Any]] = sorted(
+            subset["questions"], key=lambda q: int(q["question_id"])
+        )
+        if args.limit is not None:
+            questions = questions[: args.limit]
 
-    # Reload the full record set (resumed + new) for aggregation.
+        done = _load_done_ids()
+        pending = [q for q in questions if int(q["question_id"]) not in done]
+        print(f"{len(questions)} subset questions; {len(done)} done; {len(pending)} to run.")
+
+        client: LLMClient = DryRunClient() if args.dry_run else build_client()
+        with PARTIAL_PATH.open("a", encoding="utf-8") as partial:
+
+            def persist(record: EvalRecord) -> None:
+                partial.write(json.dumps(record) + "\n")
+                partial.flush()
+
+            run_subset(
+                pending,
+                client=client,
+                model=args.model,
+                settings=settings,
+                max_cost=args.max_cost,
+                on_record=persist,
+            )
+
+        labeled = _run_clarification_pass(client, args.model, settings)
+        LABELED_RESULTS_PATH.write_text(json.dumps([dict(x) for x in labeled]), encoding="utf-8")
+        cost = _estimated_cost(client, args.model)
+
+    # Reload the full record set for aggregation.
     records: list[EvalRecord] = [
         json.loads(line)
         for line in PARTIAL_PATH.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    labeled = _run_clarification_pass(client, args.model, settings)
-    cost = _estimated_cost(client, args.model)
+    if args.cost is not None:
+        cost = args.cost  # true total across a probe + resume (per-process tracking under-counts)
     report = _aggregate(records, labeled, args.model, args.k, cost)
 
     RESULTS_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")

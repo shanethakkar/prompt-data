@@ -61,6 +61,36 @@ en-dash and the default cp1252 stdout could not encode it. Separately, the no-em
 
 ---
 
+## [Phase 3] Re-run on Sonnet exposed eval-methodology bugs; fixed before trusting numbers
+
+**Context:** Budget was raised, so Phase 3 was re-run on Sonnet 4.6 (the demo model) at K=5 over 240
+of a 300-question pool. Reading the first Sonnet aggregate critically surfaced three flaws that made
+the headline numbers misleading. All were fixed by re-aggregating the saved records (no new API).
+
+1. **Calibration split was distribution-shifted.** Records arrive grouped by database; a sequential
+   train/test split fit on some DBs and tested on others, so isotonic calibration appeared to make
+   ECE *worse* (0.11 -> 0.17). Fix: shuffle (seeded) before the split. With an i.i.d. split,
+   calibration clearly helps: **ECE 0.439 -> 0.149, Brier 0.422 -> 0.252**.
+2. **Confidence scores were runtime-contaminated.** The probe wrote a 10-question calibration map
+   that the rest of the run then applied, so `confidence_score` in records was inconsistent. Fix:
+   compute all metrics from `confidence_raw` and apply calibration post-hoc in aggregation.
+3. **We were about to ship a map that could hurt.** The harness wrote the isotonic map
+   unconditionally. Fix: ship it only if it beats raw on the held-out split; otherwise keep raw
+   (identity). It shipped here because it genuinely improves calibration.
+
+**Honest finding (not a bug):** self-consistency agreement is a weak raw signal on BIRD — 215/240
+questions reach full agreement (raw 1.0) despite 56% accuracy. The model is confidently consistent
+even when wrong, so raw confidence is badly over-confident (ECE 0.44); calibration is what makes the
+displayed confidence honest. Consequently "confidently-wrong at threshold 0.8 = 0" is a calibration
+artifact (calibrated confidence rarely reaches 0.8), not the trust layer catching errors — so we
+report the threshold **sweep** (0.6: 0.43 -> 0.36) and headline the calibration improvement, not a
+"100% reduction".
+
+**Added:** `--reaggregate` (recompute metrics from saved records + labeled results, no API) and
+`--cost` (record true total spend; per-process token tracking under-counts a resumed run).
+
+---
+
 ## [Phase 3] build_schema_card must quote table names (reserved words like `order`)
 
 **Context:** The paid BIRD run crashed in `build_schema_card` on a database with a table named

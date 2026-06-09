@@ -15,7 +15,7 @@ comes next. Full spec: docs/SPEC.md.
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
-| 3 | Eval harness | **Complete** (BIRD run committed; confidently-wrong -40%, ECE 0.34->0.08) |
+| 3 | Eval harness | **Complete** (Sonnet/240 committed; ECE 0.44->0.15 via calibration; honest caveats) |
 | 4 | Frontend core | Not started |
 | 5 | Showcase pages | Not started |
 | 6 | Production and polish | Not started |
@@ -344,28 +344,36 @@ confidence not a measured metric (provisional label, no claims until Phase 3).
 on a pinned subset within budget, numbers are reproducible, offline gates green, and the fitted
 calibration map is picked up by the server (`confidence.calibrated == True`).
 
-**Gate results:** (2026-06-09, claude-haiku-4-5, K=3, pinned 100-question subset)
-- [x] `uv run python eval/prep_bird.py` — extracted 11 DBs; subset 100 (59/28/13 simple/mod/chal)
+**Gate results:** (2026-06-09, claude-sonnet-4-6 — matches the demo — K=5, 240 of the 300-question
+pool; re-run from the budget-shaped Haiku/100 pilot now that funds were added. ~$9.28 total spend.)
+- [x] `uv run python eval/prep_bird.py` — extracted 11 DBs; pinned pool 300 (182/89/29 simple/mod/chal)
 - [x] `uv run python eval/run_bird.py --dry-run --limit 3` — plumbing OK, no API
 - [x] `uv run ruff check backend/ data/ eval/` — clean
-- [x] `uv run mypy backend/ eval/` — clean (strict, 36 files; eval now type-checked)
+- [x] `uv run mypy backend/ eval/` — clean (strict, 36 files; eval type-checked)
 - [x] `uv run pytest backend/tests/ -q` — 86 passed
-- [x] **Paid Haiku run (100 questions, ~$0.44 this process / ~$1-2 total across a resume):**
-  - execution accuracy **44%**; answered accuracy **54%** (of 81 answered); clarification rate **19%**
-  - semantic-error rate **37%**
-  - **confidently-wrong: 26% with trust vs 43% baseline -> 17pp absolute, ~40% relative reduction**
-    (the signature number; threshold 0.8)
-  - calibration: **ECE 0.336 -> 0.084**, Brier 0.332 -> 0.247 (held-out test_n=33)
-  - clarification: **precision 1.00, recall 0.85, over-ask 0.0** (flagged 11/13 ambiguous, 0 false alarms)
-  - eval peak RSS **83.7 MB** (separate offline process, well under 4 GB)
-- [x] Server picks up the fitted map: `load_calibration_map(...).calibrated == True`
+- [x] **Sonnet run (240 questions, K=5):**
+  - execution accuracy **55.8%**; semantic-error rate **44.2%**; clarification rate **0%** on BIRD
+    (those questions are well-specified, so the gate correctly never fires)
+  - **calibration is the headline: ECE 0.439 -> 0.149, Brier 0.422 -> 0.252** on a randomized
+    held-out split (test_n=96); the isotonic map ships because it improves held-out calibration
+  - **self-consistency is a weak raw signal here:** 215/240 questions hit full agreement (raw 1.0)
+    despite 56% accuracy. The model is confidently consistent even when wrong; calibration is what
+    makes confidence honest (deflates raw 1.0 -> ~0.71)
+  - confidently-wrong: baseline **0.433**; with-trust at 0.8 = **0.0** (an ARTIFACT: calibrated
+    confidence rarely reaches 0.8 because true accuracy is ~56%). Threshold sweep is the honest read:
+    at 0.6, **0.433 -> 0.363**. We do NOT headline a "100% reduction".
+  - clarification (labeled set): **precision 1.00, recall 0.69, over-ask 0.0**
+  - eval peak RSS **96 MB** (separate offline process, well under 4 GB)
+- [x] Server picks up the fitted map: `load_calibration_map(...).calibrated == True` (apply(1.0)=0.71)
 
-**Numbers are a pinned-subset, Haiku result, not full BIRD; reported with N and caveated.**
+**Numbers are a pinned-subset Sonnet result (240 of 1534 BIRD dev), reported with N and caveated.**
 The committed `eval/out/eval_results.json` + `calibration.json` are the reproducible record.
 
-**Deltas/findings (see docs/DECISIONS.md):** the eval surfaced a real `build_schema_card` bug
-(unquoted PRAGMA on a reserved-word table name `order`), now fixed; tests were decoupled from the
-committed calibration artifact; cost is per-process so a resumed run under-reports total spend.
+**Methodology fixes applied during the re-run (see docs/DECISIONS.md):** randomized (not
+DB-sequential) calibration split; metrics computed from raw confidence, calibration applied
+post-hoc; the isotonic map ships only if it beats raw on held-out data; a confidently-wrong
+threshold sweep replaces a single hand-picked cutoff; `--reaggregate`/`--cost` for free recompute.
+Earlier finding still stands: `build_schema_card` now quotes PRAGMA table names (reserved word `order`).
 
 ### Decisions (locked)
 - Scope: pinned ~100-question BIRD subset stratified by db_id x difficulty (committed ids, seeded),
