@@ -10,6 +10,24 @@ Do not record things that are obvious from the code or spec.
 
 ---
 
+## [Phase 1] pre-commit must use the project's own ruff (version drift bites)
+
+**Context:** The first Phase 1 commit was blocked by the pre-commit hook reporting a ruff
+error (`UP`, "convert to X | Y") that `uv run ruff check` did not report.
+
+**Cause:** `.pre-commit-config.yaml` pinned `astral-sh/ruff-pre-commit` at `v0.6.9`, but the
+dev dependency is ruff `0.15.16`. The two versions disagree on lint/format output, so the
+hook and the `make lint` gate gave different results.
+
+**Fix:** switched `.pre-commit-config.yaml` to `repo: local` hooks that call
+`uv run ruff check --fix` and `uv run ruff format` (`language: system`). The hook now uses
+the exact ruff pinned in `uv.lock`, so the hook and the gate can never drift. pre-commit was
+also added to the dev group and the hook reinstalled so `.git/hooks/pre-commit` points at the
+persistent `.venv` interpreter (an ephemeral `uv run --with pre-commit` install left the hook
+unable to find `pre-commit`).
+
+---
+
 ## [Phase 1] anthropic SDK 0.107.1 structured-output shape — verified
 
 **Context:** Phase 1 generation uses structured outputs to avoid fragile parsing of SQL
