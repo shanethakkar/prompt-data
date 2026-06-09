@@ -15,7 +15,7 @@ comes next. Full spec: docs/SPEC.md.
 | 0 | Scaffold and safety floor | **Complete** (gates green, idle RSS 5.6 MB) |
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
-| 3 | Eval harness | **Complete** (Sonnet/240 committed; ECE 0.44->0.15 via calibration; honest caveats) |
+| 3 | Eval harness | **In progress** (Sonnet/240 + calibration done; adding trap eval for the signature metric) |
 | 4 | Frontend core | Not started |
 | 5 | Showcase pages | Not started |
 | 6 | Production and polish | Not started |
@@ -375,9 +375,28 @@ post-hoc; the isotonic map ships only if it beats raw on held-out data; a confid
 threshold sweep replaces a single hand-picked cutoff; `--reaggregate`/`--cost` for free recompute.
 Earlier finding still stands: `build_schema_card` now quotes PRAGMA table names (reserved word `order`).
 
+### Phase 3 addendum: trap eval (earn the signature confidently-wrong reduction)
+
+**Why:** BIRD questions are well-specified, so the clarification arm never fires and the
+confidently-wrong reduction is not demonstrated on BIRD (it's a calibration artifact at 0.8).
+The signature metric needs questions that *should not* be confidently answered.
+
+**Design (Olist demo DB; reuses the harness; uses the shipped calibration map):**
+- Expand `eval/labeled_ambiguity.json` to ~40-55 items, each tagged `category`
+  (ambiguous_metric, ambiguous_time, grain, entity, unanswerable, prompt_injection) and
+  `ambiguous` (=should-decline) plus ~15 `clear` controls.
+- `eval/run_traps.py`: for each item run BOTH pipelines.
+  - trust outcome: clarified | flagged_low_conf (calibrated confidence < threshold) | answered_confidently.
+  - baseline (no trust): answered (executed) | failed.
+  - "confidently wrong" on a should-decline question = produced a confident executed answer.
+- Metrics (`eval/metrics.py`): baseline confidently-answered rate vs trust confidently-answered
+  rate on should-decline items (the reduction = signature); over-decline rate on `clear` items (cost).
+- Output committed `eval/out/trap_results.json`. Mocked test for the runner. ~$1-2 paid run.
+- Confidence-resolution finding documented in `docs/limitations.md` (not strengthened now).
+
 ### Decisions (locked)
-- Scope: pinned ~100-question BIRD subset stratified by db_id x difficulty (committed ids, seeded),
-  Haiku 4.5, K=3. I run the paid eval (~$2-3) and commit outputs. Numbers caveated as pinned-subset.
+- Scope: pinned BIRD subset stratified by db_id x difficulty (committed ids, seeded). Re-run on
+  Sonnet 4.6, K=5, 240 questions (was Haiku/100 under the old budget). Numbers caveated as pinned-subset.
 - Retrieval deferred: full per-DB schema cards via `build_schema_card`; retrieval_score stays 1.0.
 - Calibration: pure-Python PAVA isotonic on a held-out train split; ECE/Brier on the test split
   (raw vs calibrated); write `eval/out/calibration.json` (`{"type":"isotonic","x","y"}`); wire back.
