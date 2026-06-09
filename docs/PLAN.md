@@ -16,7 +16,7 @@ comes next. Full spec: docs/SPEC.md.
 | 1 | Core text-to-SQL | **Complete** (offline gates green; live smoke passed 5/5) |
 | 2 | Trust layer | **Complete** (offline gates green; live smoke clear/ambiguous/clarify all pass) |
 | 3 | Eval harness | **Complete** (Sonnet/240 + calibration + trap eval: 59pp confidently-wrong reduction, 0 over-decline) |
-| 4 | Frontend core | **In progress** |
+| 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
 | 5 | Showcase pages | Not started |
 | 6 | Production and polish | Not started |
 
@@ -455,10 +455,15 @@ page that streams the trust pipeline stage by stage and renders the full answer 
 SVG chart, sortable table, SQL+copy, assumptions, calibrated confidence, collapsible grounding),
 plus the clarify-then-answer flow. Showcase pages are Phase 5.
 
-**Gate results:** *(fill in at end of phase)*
-- [ ] backend: `ruff`, `mypy backend/ eval/`, `pytest` (incl. new stream test); idle RSS still < 4 GB
-- [ ] frontend: `npm run lint`, `npx tsc --noEmit`, `npm run build`
-- [ ] E2E (Playwright): clear question -> answer card; ambiguous -> chips -> answer; screenshots
+**Gate results:** (2026-06-09, Next 16.2.7, React 19.2.7, Tailwind 4.3, shadcn radix-nova)
+- [x] backend: ruff + mypy strict (39 files) clean; 92 tests pass (incl. test_stream); idle RSS **5.6 MB**
+- [x] frontend: `npm run lint` clean, `npx tsc --noEmit` clean, `npm run build` succeeds (Turbopack)
+- [x] E2E live (real Sonnet via the Next /api proxy):
+  - clear ("how many orders were delivered") -> stages stream -> answer card: stat **96,478**,
+    syntax-highlighted SQL + copy, assumptions (orders / delivered filter), confidence **0.71 calibrated**
+  - ambiguous ("who are the top sellers") -> clarification card flagging **metric** with 4 option chips
+  - Playwright screenshots (hero / answer / clarify) reviewed: dark canvas, cyan accent, Geist,
+    depth cards with halo - reads as a shipped product, not a resume project
 
 ### Versions (verified current 2026-06)
 Next.js 16.2.x (Turbopack default, React 19.2), Tailwind 4.3.x, shadcn/ui (Tailwind v4 mode),

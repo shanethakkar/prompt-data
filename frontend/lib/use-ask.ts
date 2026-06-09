@@ -1,0 +1,129 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import type { StageEvent, Turn } from "@/lib/types";
+
+let counter = 0;
+const nextId = () => `turn-${Date.now()}-${counter++}`;
+
+/** Parse a fetch ReadableStream of SSE `data: {json}` frames into StageEvents. */
+async function* readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<StageEvent> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) >= 0) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of frame.split("\n")) {
+        if (line.startsWith("data: ")) {
+          yield JSON.parse(line.slice(6)) as StageEvent;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Owns the conversation thread and the streaming state machine. submit() appends a turn and
+ * streams the trust pipeline into it; clarify() answers a prior clarifying question, which
+ * re-runs the pipeline with the chosen option.
+ */
+export function useAsk() {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const active = useRef<AbortController | null>(null);
+
+  const patch = useCallback((id: string, update: Partial<Turn>) => {
+    setTurns((prev) => prev.map((t) => (t.id === id ? { ...t, ...update } : t)));
+  }, []);
+
+  const run = useCallback(
+    async (question: string, clarificationAnswer?: string) => {
+      const id = nextId();
+      setTurns((prev) => [
+        ...prev,
+        { id, question, stages: [], status: "streaming" },
+      ]);
+      setIsStreaming(true);
+      active.current?.abort();
+      const controller = new AbortController();
+      active.current = controller;
+
+      try {
+        const res = await fetch("/api/ask/stream", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            question,
+            clarification_answer: clarificationAnswer ?? null,
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) throw new Error(`Request failed (${res.status})`);
+
+        for await (const event of readSSE(res.body)) {
+          if (event.type === "stage") {
+            setTurns((prev) =>
+              prev.map((t) =>
+                t.id === id
+                  ? {
+                      ...t,
+                      stages: [
+                        ...t.stages.map((s) => ({ ...s, done: true })),
+                        { name: event.name, label: event.label, done: false },
+                      ],
+                    }
+                  : t,
+              ),
+            );
+          } else if (event.type === "clarification") {
+            patch(id, {
+              status: "done",
+              kind: "clarification",
+              clarification: event.clarification,
+              stages: [],
+            });
+          } else {
+            patch(id, {
+              status: "done",
+              kind: "answer",
+              answer: event.answer,
+              assumptions: event.assumptions,
+              confidence: event.confidence,
+              stages: [],
+            });
+          }
+        }
+        // Mark any turn still streaming (no terminal event) as done to clear spinners.
+        setTurns((prev) =>
+          prev.map((t) =>
+            t.id === id && t.status === "streaming" ? { ...t, status: "done" } : t,
+          ),
+        );
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          patch(id, { status: "error", error: (err as Error).message });
+        }
+      } finally {
+        if (active.current === controller) {
+          active.current = null;
+          setIsStreaming(false);
+        }
+      }
+    },
+    [patch],
+  );
+
+  const submit = useCallback((question: string) => run(question), [run]);
+  const clarify = useCallback(
+    (question: string, choice: string) => run(question, choice),
+    [run],
+  );
+
+  return { turns, isStreaming, submit, clarify };
+}

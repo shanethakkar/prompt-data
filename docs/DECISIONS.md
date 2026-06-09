@@ -61,6 +61,25 @@ en-dash and the default cp1252 stdout could not encode it. Separately, the no-em
 
 ---
 
+## [Phase 4] Frontend scaffold + streaming findings
+
+- **create-next-app pulled a preview Next (16.3.0-preview.0)** whose SWC binary 404'd. Pinned
+  `next` and `eslint-config-next` to the stable **16.2.7** LTS (`--save-exact`); builds cleanly.
+- **shadcn CLI changed:** `-b` is now the primitive base (`radix`|`base`), not base color, and init
+  prompts for a preset even with `-y`. Used `init -y -f -b radix -t next -p nova` - the **Nova preset
+  ships Geist + Lucide**, matching the spec aesthetic. Style key is `radix-nova`.
+- **Font-variable mismatch:** the Nova `globals.css` `@theme` maps `--font-sans`, but the scaffold's
+  layout declared `--font-geist-sans`. Fixed layout to use `variable: "--font-sans"` / `--font-geist-mono`.
+- **SSE through the Next dev/start proxy works** with no buffering (rewrite `/api/:path*` ->
+  backend). Verified the full path browser -> Next proxy -> FastAPI -> SSE stages -> answer with a
+  real Sonnet call; no CORS needed (CORS middleware kept as a fallback). `X-Accel-Buffering: no` set.
+- **4 GB guard held:** the SSE endpoint reuses the pipeline and imports nothing heavy; idle server
+  RSS unchanged at 5.6 MB. The frontend is a separate Node process.
+- **Streaming pattern:** sync FastAPI endpoint + sync generator so Starlette iterates it in a
+  threadpool (blocking Anthropic calls do not block the event loop); single worker, low concurrency.
+
+---
+
 ## [Phase 3] Trap eval earns the signature metric that BIRD cannot
 
 **Context:** BIRD questions are well-specified, so the clarification arm never fires and the
