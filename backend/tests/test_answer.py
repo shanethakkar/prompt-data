@@ -40,7 +40,19 @@ def test_suggest_chart_bar_for_category_numeric() -> None:
 
 
 def test_suggest_chart_line_for_time_numeric() -> None:
-    assert suggest_chart(["order_month", "orders"], [("2017-01", 10)]) == "line"
+    assert suggest_chart(["order_month", "orders"], [("2017-01", 10), ("2017-02", 14)]) == "line"
+    # A month/year/date column name keeps the line even when values are bare numbers.
+    assert suggest_chart(["month", "orders"], [("01", 10), ("02", 14), ("03", 9)]) == "line"
+    # Full dates and calendar years are also time series.
+    assert suggest_chart(["d", "n"], [("2017-03-15", 3), ("2017-03-16", 5)]) == "line"
+    assert suggest_chart(["year", "orders"], [(2016, 9), (2017, 11), (2018, 13)]) == "line"
+
+
+def test_suggest_chart_bar_for_categorical_time_like_names() -> None:
+    # "day of week" reads like time but is categorical -> bar, not line.
+    assert suggest_chart(["day_of_week", "orders"], [("Monday", 120), ("Tuesday", 98)]) == "bar"
+    assert suggest_chart(["day_of_week", "avg_orders"], [(0, 120), (1, 98), (2, 105)]) == "bar"
+    assert suggest_chart(["payment_type", "n"], [("credit_card", 50), ("boleto", 20)]) == "bar"
 
 
 def test_suggest_chart_table_for_wide() -> None:

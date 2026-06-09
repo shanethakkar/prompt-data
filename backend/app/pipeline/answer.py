@@ -7,6 +7,7 @@ both render. The trust layer (assumptions, confidence) extends this in Phase 2.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,8 +27,12 @@ from backend.app.pipeline.route import select_model
 from backend.app.pipeline.schema import build_schema_card, select_schema_context
 from backend.app.semantic_layer import render_semantic_layer
 
-# Tokens that mark a column as time-valued for the chart heuristic.
-_TIME_HINTS = ("date", "timestamp", "_ts", "month", "year", "day")
+# A line chart implies a trend over continuous time. It is chosen when the x-axis column name is
+# a continuous time unit, or its values look like dates/timestamps or a run of calendar years.
+# "day"/"weekday"/"hour" are intentionally absent: those are categorical cycles (e.g. "day of
+# week") that read better as bars, which was the source of mislabeled line charts.
+_TIME_NAME_HINTS = ("date", "month", "year", "quarter", "timestamp", "_ts")
+_DATE_VALUE = re.compile(r"^\s*\d{4}[-/]\d{1,2}([-/]\d{1,2})?([ T]\d{1,2}:\d{2})?\s*$")
 
 # Phase 1 uses the full schema (no retrieval), so retrieval contributes no
 # uncertainty. Phase 3 replaces this with the real top-k retrieval score.
@@ -55,17 +60,41 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _is_year(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return 1900 <= value <= 2100
+    if isinstance(value, str) and re.fullmatch(r"\d{4}", value.strip()):
+        return 1900 <= int(value) <= 2100
+    return False
+
+
+def _looks_temporal(col_name: str, values: list[Any]) -> bool:
+    """True when the x-axis is a real time sequence (continuous time unit by name or by value)."""
+    if any(token in col_name.lower() for token in _TIME_NAME_HINTS):
+        return True
+    sample = [v for v in values if v is not None][:24]
+    if not sample:
+        return False
+    date_like = sum(1 for v in sample if isinstance(v, str) and _DATE_VALUE.match(v))
+    if date_like >= max(2, int(len(sample) * 0.7)):
+        return True
+    return len(sample) >= 2 and all(_is_year(v) for v in sample)
+
+
 def suggest_chart(columns: list[str], rows: list[tuple[Any, ...]]) -> str:
-    """Heuristic chart type from the result shape. Pure function."""
+    """Heuristic chart type from the result shape and x-axis. Pure function.
+
+    Two numeric-valued columns plot as a line only when the first column is a genuine time
+    sequence; otherwise the x-axis is categorical (e.g. "day of week") and a bar fits better.
+    """
     if not rows or not columns:
         return "none"
     if len(rows) == 1 and len(columns) == 1:
         return "stat"
-    if len(columns) == 2:
-        first_is_time = any(hint in columns[0].lower() for hint in _TIME_HINTS)
-        second_numeric = _is_number(rows[0][1])
-        if second_numeric:
-            return "line" if first_is_time else "bar"
+    if len(columns) == 2 and _is_number(rows[0][1]):
+        return "line" if _looks_temporal(columns[0], [row[0] for row in rows]) else "bar"
     return "table"
 
 
