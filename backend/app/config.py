@@ -8,6 +8,7 @@ elsewhere.
 from __future__ import annotations
 
 import os
+import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -32,6 +33,16 @@ class Settings:
     cors_origins: tuple[str, ...]
     rate_limit_per_minute: int
     daily_request_cap: int
+    # Bring-your-own-data uploads.
+    upload_dir: str
+    upload_max_csv_mb: float
+    upload_max_db_mb: float
+    upload_max_rows: int
+    upload_max_columns: int
+    session_ttl_minutes: int
+    max_sessions: int
+    # When False (custom uploaded datasets), the pipeline skips the Olist semantic layer.
+    semantic_enabled: bool = True
 
 
 @lru_cache
@@ -53,4 +64,13 @@ def get_settings() -> Settings:
         ),
         rate_limit_per_minute=int(os.environ.get("RATE_LIMIT_PER_MINUTE", "5")),
         daily_request_cap=int(os.environ.get("DAILY_REQUEST_CAP", "500")),
+        upload_dir=os.environ.get(
+            "UPLOAD_DIR", os.path.join(tempfile.gettempdir(), "prompt-data-uploads")
+        ),
+        upload_max_csv_mb=float(os.environ.get("UPLOAD_MAX_CSV_MB", "5")),
+        upload_max_db_mb=float(os.environ.get("UPLOAD_MAX_DB_MB", "20")),
+        upload_max_rows=int(os.environ.get("UPLOAD_MAX_ROWS", "50000")),
+        upload_max_columns=int(os.environ.get("UPLOAD_MAX_COLUMNS", "60")),
+        session_ttl_minutes=int(os.environ.get("SESSION_TTL_MINUTES", "60")),
+        max_sessions=int(os.environ.get("MAX_SESSIONS", "50")),
     )

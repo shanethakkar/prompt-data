@@ -9,17 +9,26 @@ ceiling depends on the server process staying lean; see backend/tests/test_serve
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections.abc import Iterator
 from dataclasses import asdict
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.app.config import Settings, get_settings
+from backend.app.datasets import (
+    SessionStore,
+    UploadError,
+    ingest_csv,
+    is_sqlite,
+    save_sqlite,
+)
 from backend.app.llm import LLMClient, get_llm_client
 from backend.app.pipeline.answer import TrustedResponse, respond, respond_events
 from backend.app.pipeline.schema import schema_tables
@@ -38,6 +47,27 @@ app.add_middleware(
 
 # Process-local guard (single worker) protecting the Anthropic budget on the public /ask routes.
 _LIMITER = RateLimiter(get_settings().rate_limit_per_minute, get_settings().daily_request_cap)
+
+# Process-local registry of uploaded bring-your-own datasets (single worker; TTL-evicted).
+_STORE = SessionStore(get_settings())
+
+
+def _dataset_settings(settings: Settings, session: str | None) -> Settings:
+    """Resolve the active dataset: the Olist demo by default, or an uploaded session.
+
+    A custom dataset runs with the semantic layer off and uncalibrated confidence (the
+    calibration map was fit on Olist), which the UI labels honestly.
+    """
+    if not session:
+        return settings
+    info = _STORE.get(session)
+    if info is None:
+        raise HTTPException(
+            status_code=404, detail="That uploaded dataset has expired. Please upload it again."
+        )
+    return dataclasses.replace(
+        settings, demo_db_path=info.path, semantic_enabled=False, calibration_path=""
+    )
 
 
 def _client_ip(request: Request) -> str:
@@ -63,6 +93,7 @@ def rate_guard(request: Request, settings: Annotated[Settings, Depends(get_setti
 class AskRequest(BaseModel):
     question: str
     clarification_answer: str | None = None
+    session: str | None = None  # an uploaded bring-your-own dataset; absent => Olist demo
 
 
 @app.get("/health")
@@ -76,13 +107,51 @@ def schema(
     settings: Annotated[Settings, Depends(get_settings)],
     session: str | None = None,
 ) -> dict[str, Any]:
-    """Structured schema for the active dataset so the UI shows what can be asked.
+    """Structured schema for the active dataset (Olist demo, or an uploaded session)."""
+    active = _dataset_settings(settings, session)
+    tables = [asdict(table) for table in schema_tables(active.demo_db_path)]
+    return {"dataset": "custom" if session else "olist", "tables": tables}
 
-    `session` selects a bring-your-own-data upload (Part C); until then it resolves to Olist.
-    """
-    _ = session
-    tables = [asdict(table) for table in schema_tables(settings.demo_db_path)]
-    return {"dataset": "olist", "tables": tables}
+
+async def _read_capped(file: UploadFile, settings: Settings) -> bytes:
+    """Read an upload into memory with a hard ceiling (per-type caps enforced during ingest)."""
+    ceiling = int(max(settings.upload_max_csv_mb, settings.upload_max_db_mb) * 1024 * 1024) + (
+        1024 * 1024
+    )
+    data = bytearray()
+    while chunk := await file.read(256 * 1024):
+        data.extend(chunk)
+        if len(data) > ceiling:
+            raise HTTPException(status_code=413, detail="That file is too large.")
+    return bytes(data)
+
+
+@app.post("/upload", dependencies=[Depends(rate_guard)])
+async def upload(
+    file: UploadFile,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict[str, Any]:
+    """Ingest an uploaded CSV or SQLite file into a per-session dataset and return its schema."""
+    content = await _read_capped(file, settings)
+    session_id, path = _STORE.new_path()
+    name = (file.filename or "").lower()
+    is_db = name.endswith((".db", ".sqlite", ".sqlite3")) or (
+        not name.endswith(".csv") and is_sqlite(content)
+    )
+    try:
+        if is_db:
+            save_sqlite(content, path, settings)
+            label = "sqlite"
+        else:
+            ingest_csv(content, path, settings)
+            label = "csv"
+    except UploadError as exc:
+        Path(path).unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=exc.message) from exc
+
+    session = _STORE.register(session_id, path, label)
+    tables = [asdict(table) for table in schema_tables(path)]
+    return {"session": session.id, "label": label, "filename": file.filename, "tables": tables}
 
 
 def _serialize(result: TrustedResponse) -> dict[str, Any]:
@@ -120,7 +189,7 @@ async def ask(
     result = respond(
         request.question,
         client=client,
-        settings=settings,
+        settings=_dataset_settings(settings, request.session),
         clarification_answer=request.clarification_answer,
     )
     return _serialize(result)
@@ -137,12 +206,14 @@ def ask_stream(
     A sync endpoint + sync generator, so Starlette iterates it in a threadpool (the blocking
     Anthropic calls do not block the event loop). One uvicorn worker; low concurrency by design.
     """
+    # Resolve the dataset before streaming so an expired session is a clean 404, not mid-stream.
+    active = _dataset_settings(settings, request.session)
 
     def event_stream() -> Iterator[str]:
         for event in respond_events(
             request.question,
             client=client,
-            settings=settings,
+            settings=active,
             clarification_answer=request.clarification_answer,
         ):
             yield f"data: {json.dumps(_event_payload(event))}\n\n"

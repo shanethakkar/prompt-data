@@ -18,3 +18,15 @@ export interface SchemaResponse {
   dataset: string;
   tables: SchemaTable[];
 }
+
+export interface UploadResponse {
+  session: string;
+  label: string;
+  filename: string | null;
+  tables: SchemaTable[];
+}
+
+// The active dataset: the built-in Olist demo, or an uploaded bring-your-own file.
+export type Dataset =
+  | { kind: "olist" }
+  | { kind: "custom"; session: string; filename: string | null; tables: SchemaTable[] };

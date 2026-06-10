@@ -15,10 +15,12 @@ export function QuestionInput({
   onSubmit,
   disabled,
   showStarters,
+  placeholder = "Ask the Olist database anything…",
 }: {
   onSubmit: (question: string) => void;
   disabled?: boolean;
   showStarters?: boolean;
+  placeholder?: string;
 }) {
   const [value, setValue] = useState("");
 
@@ -42,7 +44,7 @@ export function QuestionInput({
             }
           }}
           rows={1}
-          placeholder="Ask the Olist database anything…"
+          placeholder={placeholder}
           aria-label="Ask a question"
           className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
         />

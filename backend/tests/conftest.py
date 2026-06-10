@@ -8,6 +8,7 @@ file in tmp_path; tests never touch the real (gitignored) demo.db.
 from __future__ import annotations
 
 import sqlite3
+import tempfile
 import threading
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -116,4 +117,11 @@ def test_settings(fixture_db: str) -> Settings:
         # Both <= 0 disables the /ask rate guard for deterministic endpoint tests.
         rate_limit_per_minute=0,
         daily_request_cap=0,
+        upload_dir=str(Path(tempfile.gettempdir()) / "prompt-data-test-uploads"),
+        upload_max_csv_mb=1.0,
+        upload_max_db_mb=5.0,
+        upload_max_rows=10_000,
+        upload_max_columns=40,
+        session_ttl_minutes=60,
+        max_sessions=10,
     )

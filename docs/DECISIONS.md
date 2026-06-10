@@ -61,6 +61,26 @@ en-dash and the default cp1252 stdout could not encode it. Separately, the no-em
 
 ---
 
+## [Phase 7 Part C] Bring-your-own-data: stdlib ingestion, per-session DBs, honest custom mode
+
+- **CSV ingestion is stdlib-only** (`csv` + `sqlite3`, no pandas), so the server holds the 4 GB
+  ceiling - idle RSS stayed 5.6 MB after the feature. CSV -> a one-table SQLite ("data") with sniffed
+  column types (INTEGER/REAL/TEXT); `.db`/`.sqlite` validated by the `SQLite format 3` header + size
+  cap and queried read-only. Hard caps: 5 MB CSV / 20 MB DB / 50k rows / 60 cols (env-tunable).
+- **Per-session, ephemeral.** Uploads become a session id -> file under `UPLOAD_DIR`, tracked in a
+  process-local `SessionStore` (single worker) with TTL (60 min) + count/disk eviction. Render's disk
+  is ephemeral anyway; a restart clears everything, which is fine.
+- **The SELECT-only/read-only sandbox is unchanged** and remains the backstop for uploaded data - a
+  malicious `.db` (views/triggers) still can't write, and generated SQL still must be a single SELECT.
+- **Custom datasets are honest:** `dataclasses.replace(settings, demo_db_path=..., semantic_enabled=
+  False, calibration_path="")` turns off the Olist semantic layer and runs confidence **uncalibrated**
+  (the map was fit on Olist). The UI labels it "PROVISIONAL" and shows an uncalibrated banner.
+- **Backward-compatible with deploy skew:** `AskRequest.session` is optional, and an older backend
+  simply ignores it (answers against Olist); the upload control degrades to an error message if
+  `/upload` 404s. So a frontend-ahead-of-backend window does not break normal asking.
+
+---
+
 ## [Phase 6] Deploy: slim gzipped DB, in-memory guard, direct-CORS streaming
 
 - **Slim DB still exceeded 100 MB.** Dropping geolocation got demo.db to 112 MB; also dropping the

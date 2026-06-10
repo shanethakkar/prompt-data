@@ -109,9 +109,14 @@ def suggest_chart(columns: list[str], rows: list[tuple[Any, ...]]) -> str:
 
 
 def _contexts(question: str, settings: Settings) -> tuple[str, str, str]:
-    """Build (schema_context, semantic_context, model) for a question."""
+    """Build (schema_context, semantic_context, model) for a question.
+
+    The Olist semantic layer is skipped for custom uploaded datasets (semantic_enabled False):
+    its business-term mappings only make sense for Olist.
+    """
     card = build_schema_card(settings.demo_db_path)
-    return select_schema_context(question, card), render_semantic_layer(), select_model(question)
+    semantic = render_semantic_layer() if settings.semantic_enabled else ""
+    return select_schema_context(question, card), semantic, select_model(question)
 
 
 def _to_answer_result(question: str, result: SelfCorrectionResult) -> AnswerResult:

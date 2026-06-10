@@ -1,16 +1,31 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { Database } from "lucide-react";
 import { useAsk } from "@/lib/use-ask";
+import type { Dataset, UploadResponse } from "@/lib/schema-types";
 import { QuestionInput } from "@/components/ask/question-input";
 import { StageProgress } from "@/components/ask/stage-progress";
 import { AnswerCard } from "@/components/ask/answer-card";
 import { ClarificationCard } from "@/components/ask/clarification-card";
 import { SchemaDrawer } from "@/components/ask/schema-drawer";
 
+function CustomBanner({ filename }: { filename: string | null }) {
+  return (
+    <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2 text-xs text-muted-foreground">
+      <Database className="size-3.5 shrink-0 text-primary" />
+      <span>
+        Querying <span className="font-medium text-foreground">{filename ?? "your upload"}</span>.
+        Confidence is uncalibrated for custom data.
+      </span>
+    </div>
+  );
+}
+
 export default function AskPage() {
-  const { turns, isStreaming, submit, clarify } = useAsk();
+  const { turns, isStreaming, submit, clarify, reset } = useAsk();
+  const [dataset, setDataset] = useState<Dataset>({ kind: "olist" });
   const reduce = useReducedMotion();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -19,6 +34,19 @@ export default function AskPage() {
   }, [turns, reduce]);
 
   const empty = turns.length === 0;
+  const custom = dataset.kind === "custom";
+  const session = dataset.kind === "custom" ? dataset.session : undefined;
+  const placeholder = custom ? "Ask your data anything…" : "Ask the Olist database anything…";
+
+  // Switching datasets starts a fresh conversation (the thread can't mix sources).
+  function handleUpload(r: UploadResponse) {
+    setDataset({ kind: "custom", session: r.session, filename: r.filename, tables: r.tables });
+    reset();
+  }
+  function handleUseOlist() {
+    setDataset({ kind: "olist" });
+    reset();
+  }
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-3xl flex-col px-5">
@@ -31,19 +59,24 @@ export default function AskPage() {
             className="mb-8"
           >
             <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Ask in plain English.{" "}
-              <span className="text-primary">Trust the answer.</span>
+              Ask in plain English. <span className="text-primary">Trust the answer.</span>
             </h1>
             <p className="mt-3 max-w-xl text-pretty text-[15px] leading-relaxed text-muted-foreground">
-              Prompt Data turns questions about the Olist e-commerce database into SQL, surfaces the
-              assumptions it made, asks when a question is ambiguous instead of guessing, and
-              attaches a calibrated confidence signal.
+              {custom
+                ? "Querying your uploaded data. Prompt Data writes the SQL, surfaces its assumptions, and asks when a question is ambiguous. Confidence is uncalibrated for custom datasets."
+                : "Prompt Data turns questions about the Olist e-commerce database into SQL, surfaces the assumptions it made, asks when a question is ambiguous instead of guessing, and attaches a calibrated confidence signal. Or upload your own CSV or database."}
             </p>
             <div className="mt-5">
-              <SchemaDrawer />
+              <SchemaDrawer dataset={dataset} onUpload={handleUpload} onUseOlist={handleUseOlist} />
             </div>
           </motion.div>
-          <QuestionInput onSubmit={submit} disabled={isStreaming} showStarters />
+          {custom && <CustomBanner filename={dataset.filename} />}
+          <QuestionInput
+            onSubmit={(q) => submit(q, session)}
+            disabled={isStreaming}
+            showStarters={!custom}
+            placeholder={placeholder}
+          />
         </div>
       ) : (
         <>
@@ -77,7 +110,7 @@ export default function AskPage() {
                   <ClarificationCard
                     clarification={turn.clarification}
                     disabled={isStreaming}
-                    onSelect={(choice) => clarify(turn.question, choice)}
+                    onSelect={(choice) => clarify(turn.question, choice, session)}
                   />
                 )}
               </div>
@@ -87,9 +120,19 @@ export default function AskPage() {
 
           <div className="sticky bottom-0 mt-auto border-t border-border/60 bg-background/80 py-4 backdrop-blur-xl">
             <div className="mb-2.5 flex justify-end">
-              <SchemaDrawer label="Data" />
+              <SchemaDrawer
+                label="Data"
+                dataset={dataset}
+                onUpload={handleUpload}
+                onUseOlist={handleUseOlist}
+              />
             </div>
-            <QuestionInput onSubmit={submit} disabled={isStreaming} />
+            {custom && <CustomBanner filename={dataset.filename} />}
+            <QuestionInput
+              onSubmit={(q) => submit(q, session)}
+              disabled={isStreaming}
+              placeholder={placeholder}
+            />
           </div>
         </>
       )}

@@ -45,8 +45,15 @@ export function useAsk() {
     setTurns((prev) => prev.map((t) => (t.id === id ? { ...t, ...update } : t)));
   }, []);
 
+  const reset = useCallback(() => {
+    active.current?.abort();
+    active.current = null;
+    setIsStreaming(false);
+    setTurns([]);
+  }, []);
+
   const run = useCallback(
-    async (question: string, clarificationAnswer?: string) => {
+    async (question: string, clarificationAnswer?: string, session?: string) => {
       const id = nextId();
       setTurns((prev) => [
         ...prev,
@@ -62,6 +69,7 @@ export function useAsk() {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
+            session: session ?? null,
             question,
             clarification_answer: clarificationAnswer ?? null,
           }),
@@ -125,11 +133,14 @@ export function useAsk() {
     [patch],
   );
 
-  const submit = useCallback((question: string) => run(question), [run]);
+  const submit = useCallback(
+    (question: string, session?: string) => run(question, undefined, session),
+    [run],
+  );
   const clarify = useCallback(
-    (question: string, choice: string) => run(question, choice),
+    (question: string, choice: string, session?: string) => run(question, choice, session),
     [run],
   );
 
-  return { turns, isStreaming, submit, clarify };
+  return { turns, isStreaming, submit, clarify, reset };
 }
