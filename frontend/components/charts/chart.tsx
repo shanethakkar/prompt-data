@@ -6,6 +6,16 @@ import { compactNumber, formatCell, isNumber } from "@/lib/format";
 // Hand-built SVG charts, no chart library (per spec). Each is responsive (viewBox + width 100%)
 // and ARIA-labelled. The backend picks chart_type from the result shape.
 
+/** The value (y) column: the rightmost numeric column after the x-axis. Mirrors the backend
+ *  heuristic so an extra sort/helper column (e.g. day_of_week, day_num, avg_price) plots right. */
+function valueIndex(rows: Cell[][]): number {
+  const row = rows[0] ?? [];
+  for (let i = row.length - 1; i >= 1; i--) {
+    if (isNumber(row[i])) return i;
+  }
+  return 1;
+}
+
 /** Evenly spaced, nicely-rounded ticks from 0 covering [0, maxValue]. */
 function niceTicks(maxValue: number, count = 4): number[] {
   if (!(maxValue > 0)) return [0, 1];
@@ -33,8 +43,9 @@ function StatCard({ label, value }: { label: string; value: Cell }) {
 }
 
 function BarChart({ rows, columns }: { rows: Cell[][]; columns: string[] }) {
+  const vi = valueIndex(rows);
   const data = rows
-    .map((r) => ({ label: formatCell(r[0]), value: isNumber(r[1]) ? r[1] : 0 }))
+    .map((r) => ({ label: formatCell(r[0]), value: isNumber(r[vi]) ? r[vi] : 0 }))
     .slice(0, 12);
   const rowH = 34;
   const labelW = 168;
@@ -54,7 +65,7 @@ function BarChart({ rows, columns }: { rows: Cell[][]; columns: string[] }) {
       viewBox={`0 0 ${width} ${height}`}
       className="w-full"
       role="img"
-      aria-label={`Bar chart of ${columns[1]} by ${columns[0]}, values from 0 to ${compactNumber(axisMax)}`}
+      aria-label={`Bar chart of ${columns[vi]} by ${columns[0]}, values from 0 to ${compactNumber(axisMax)}`}
     >
       {/* value gridlines + x-axis ticks */}
       {ticks.map((t, i) => (
@@ -85,14 +96,15 @@ function BarChart({ rows, columns }: { rows: Cell[][]; columns: string[] }) {
       <line x1={labelW} y1={top} x2={labelW} y2={axisY} className="stroke-border/70" />
       <line x1={labelW} y1={axisY} x2={labelW + barW} y2={axisY} className="stroke-border/70" />
       <text x={labelW + barW / 2} y={height - 4} textAnchor="middle" className="fill-muted-foreground" fontSize={11}>
-        {columns[1]}
+        {columns[vi]}
       </text>
     </svg>
   );
 }
 
 function LineChart({ rows, columns }: { rows: Cell[][]; columns: string[] }) {
-  const data = rows.map((r) => ({ label: formatCell(r[0]), value: isNumber(r[1]) ? r[1] : 0 }));
+  const vi = valueIndex(rows);
+  const data = rows.map((r) => ({ label: formatCell(r[0]), value: isNumber(r[vi]) ? r[vi] : 0 }));
   const w = 760;
   const h = 280;
   const pad = { top: 14, right: 18, bottom: 46, left: 64 };
@@ -114,7 +126,7 @@ function LineChart({ rows, columns }: { rows: Cell[][]; columns: string[] }) {
       viewBox={`0 0 ${w} ${h}`}
       className="w-full"
       role="img"
-      aria-label={`Line chart of ${columns[1]} over ${columns[0]}, values from 0 to ${compactNumber(yMax)}`}
+      aria-label={`Line chart of ${columns[vi]} over ${columns[0]}, values from 0 to ${compactNumber(yMax)}`}
     >
       {/* y gridlines + ticks */}
       {ticks.map((t, i) => (
@@ -146,7 +158,7 @@ function LineChart({ rows, columns }: { rows: Cell[][]; columns: string[] }) {
         {columns[0]}
       </text>
       <text x={14} y={pad.top + plotH / 2} textAnchor="middle" transform={`rotate(-90 14 ${pad.top + plotH / 2})`} className="fill-muted-foreground" fontSize={11}>
-        {columns[1]}
+        {columns[vi]}
       </text>
     </svg>
   );

@@ -86,16 +86,26 @@ def _looks_temporal(col_name: str, values: list[Any]) -> bool:
 def suggest_chart(columns: list[str], rows: list[tuple[Any, ...]]) -> str:
     """Heuristic chart type from the result shape and x-axis. Pure function.
 
-    Two numeric-valued columns plot as a line only when the first column is a genuine time
-    sequence; otherwise the x-axis is categorical (e.g. "day of week") and a bar fits better.
+    The first column is the x-axis (a label or time). The value plotted is the rightmost numeric
+    column, so an extra sort/helper column (e.g. "day_of_week, day_num, avg_price") still charts.
+    A line is used only for a genuine time sequence; categorical x-axes get a bar.
     """
     if not rows or not columns:
         return "none"
     if len(rows) == 1 and len(columns) == 1:
         return "stat"
-    if len(columns) == 2 and _is_number(rows[0][1]):
-        return "line" if _looks_temporal(columns[0], [row[0] for row in rows]) else "bar"
-    return "table"
+    if not 2 <= len(columns) <= 4:
+        return "table"
+    # The value is the rightmost numeric column after the x-axis (column 0). No numeric measure
+    # to plot -> table.
+    value_idx = next((i for i in range(len(columns) - 1, 0, -1) if _is_number(rows[0][i])), None)
+    if value_idx is None:
+        return "table"
+    # A non-numeric column between the x-axis and the value is a second grouping dimension
+    # (e.g. "revenue by category and region"); collapsing it into one bar would mislead -> table.
+    if any(not _is_number(rows[0][i]) for i in range(1, value_idx)):
+        return "table"
+    return "line" if _looks_temporal(columns[0], [row[0] for row in rows]) else "bar"
 
 
 def _contexts(question: str, settings: Settings) -> tuple[str, str, str]:

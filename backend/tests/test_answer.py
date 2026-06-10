@@ -55,8 +55,24 @@ def test_suggest_chart_bar_for_categorical_time_like_names() -> None:
     assert suggest_chart(["payment_type", "n"], [("credit_card", 50), ("boleto", 20)]) == "bar"
 
 
+def test_suggest_chart_charts_with_helper_column() -> None:
+    # A sort/helper column (day_num) between the label and the metric still charts: x = label,
+    # value = rightmost numeric column (avg_price).
+    rows = [("Sunday", 0, 133.7), ("Monday", 1, 138.8), ("Tuesday", 2, 137.2)]
+    assert suggest_chart(["day_of_week", "day_num", "avg_price"], rows) == "bar"
+    rows_m = [("2017-01", 1, 800), ("2017-02", 2, 1780)]
+    assert suggest_chart(["month", "month_num", "orders"], rows_m) == "line"
+    # Up to four columns of numeric helpers/measures still charts the rightmost value.
+    assert suggest_chart(["day", "day_num", "n", "avg"], [("Mon", 1, 9, 5.0)]) == "bar"
+
+
 def test_suggest_chart_table_for_wide() -> None:
-    assert suggest_chart(["a", "b", "c"], [(1, 2, 3)]) == "table"
+    # Five+ columns is a genuine multi-metric table.
+    assert suggest_chart(["a", "b", "c", "d", "e"], [(1, 2, 3, 4, 5)]) == "table"
+    # No numeric measure after the label -> table.
+    assert suggest_chart(["category", "label"], [("toys", "x"), ("books", "y")]) == "table"
+    # A second categorical dimension (region) before the value -> table, not a collapsed bar.
+    assert suggest_chart(["category", "region", "revenue"], [("toys", "south", 50.0)]) == "table"
 
 
 # --------------------------------------------------------------------------- #
