@@ -19,7 +19,7 @@ comes next. Full spec: docs/SPEC.md.
 | 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
 | 5 | Showcase pages | **Complete** (4 static pages from committed JSON; Vercel-ready; screenshots reviewed) |
 | 6 | Deploy (Vercel + Render) | **Complete** (repo deploy-ready + pushed; go-live via docs/DEPLOY.md) |
-| 7 | Usability + bring-your-own-data | **In progress** (A,B,C done; D-H polish underway) |
+| 7 | Usability + bring-your-own-data | **Complete** (charts, schema explorer, BYO upload, polish; README) |
 
 ---
 

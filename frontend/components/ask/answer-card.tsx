@@ -1,8 +1,10 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Download, Loader2 } from "lucide-react";
 import type { AnswerResult, Assumptions, Confidence } from "@/lib/types";
+import { downloadCsv } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Chart } from "@/components/charts/chart";
 import { ResultTable } from "@/components/ask/result-table";
@@ -100,6 +102,17 @@ export function AnswerCard({
         {answer.self_correction_fired && <MetaPill>self-corrected</MetaPill>}
         {answer.attempts > 1 && <MetaPill>{answer.attempts} attempts</MetaPill>}
         {answer.timed_out && <MetaPill>timed out</MetaPill>}
+        {hasRows && !answer.error && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => downloadCsv("prompt-data-result.csv", answer.columns, answer.rows)}
+            className="ml-auto h-7 gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <Download className="size-3.5" />
+            Export CSV
+          </Button>
+        )}
       </div>
     </motion.div>
   );

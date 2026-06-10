@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Database } from "lucide-react";
 import { useAsk } from "@/lib/use-ask";
+import { apiUrl } from "@/lib/api";
 import type { Dataset, UploadResponse } from "@/lib/schema-types";
 import { QuestionInput } from "@/components/ask/question-input";
 import { StageProgress } from "@/components/ask/stage-progress";
@@ -33,18 +34,38 @@ export default function AskPage() {
     endRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "end" });
   }, [turns, reduce]);
 
+  // On load: warm the (possibly cold) backend, and auto-run a shared ?q= question (Olist only).
+  const loaded = useRef(false);
+  useEffect(() => {
+    void fetch(apiUrl("/health")).catch(() => {});
+    if (loaded.current) return;
+    loaded.current = true;
+    const shared = new URLSearchParams(window.location.search).get("q");
+    if (shared) submit(shared);
+  }, [submit]);
+
   const empty = turns.length === 0;
   const custom = dataset.kind === "custom";
   const session = dataset.kind === "custom" ? dataset.session : undefined;
   const placeholder = custom ? "Ask your data anything…" : "Ask the Olist database anything…";
 
+  // Olist questions are shareable via the URL; uploads are session-local so they are not.
+  function ask(question: string) {
+    if (!custom) {
+      window.history.replaceState(null, "", `/?q=${encodeURIComponent(question)}`);
+    }
+    submit(question, session);
+  }
+
   // Switching datasets starts a fresh conversation (the thread can't mix sources).
   function handleUpload(r: UploadResponse) {
     setDataset({ kind: "custom", session: r.session, filename: r.filename, tables: r.tables });
+    window.history.replaceState(null, "", "/");
     reset();
   }
   function handleUseOlist() {
     setDataset({ kind: "olist" });
+    window.history.replaceState(null, "", "/");
     reset();
   }
 
@@ -72,7 +93,7 @@ export default function AskPage() {
           </motion.div>
           {custom && <CustomBanner filename={dataset.filename} />}
           <QuestionInput
-            onSubmit={(q) => submit(q, session)}
+            onSubmit={ask}
             disabled={isStreaming}
             showStarters={!custom}
             placeholder={placeholder}
@@ -129,7 +150,7 @@ export default function AskPage() {
             </div>
             {custom && <CustomBanner filename={dataset.filename} />}
             <QuestionInput
-              onSubmit={(q) => submit(q, session)}
+              onSubmit={ask}
               disabled={isStreaming}
               placeholder={placeholder}
             />

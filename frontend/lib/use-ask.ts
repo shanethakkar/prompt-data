@@ -75,7 +75,12 @@ export function useAsk() {
           }),
           signal: controller.signal,
         });
-        if (!res.ok || !res.body) throw new Error(`Request failed (${res.status})`);
+        if (!res.ok) {
+          // Surface the backend's friendly message (e.g. rate limit, expired upload).
+          const body = (await res.json().catch(() => null)) as { detail?: string } | null;
+          throw new Error(body?.detail ?? `The server returned an error (${res.status}).`);
+        }
+        if (!res.body) throw new Error("The server sent no response stream.");
 
         for await (const event of readSSE(res.body)) {
           if (event.type === "stage") {
@@ -120,8 +125,14 @@ export function useAsk() {
           ),
         );
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          patch(id, { status: "error", error: (err as Error).message });
+        const e = err as Error;
+        if (e.name !== "AbortError") {
+          // A bare network failure usually means the free-tier backend is cold or offline.
+          const message =
+            e.name === "TypeError"
+              ? "Couldn't reach the demo server. It may be waking up (free tier) or offline — please try again."
+              : e.message;
+          patch(id, { status: "error", error: message });
         }
       } finally {
         if (active.current === controller) {

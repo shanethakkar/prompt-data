@@ -1,16 +1,25 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Check, Loader2 } from "lucide-react";
 import type { Stage } from "@/lib/types";
 
 export function StageProgress({ stages }: { stages: Stage[] }) {
   const reduce = useReducedMotion();
+  // If nothing has streamed back after a few seconds, the free-tier backend is likely cold-starting.
+  const [waking, setWaking] = useState(false);
+  useEffect(() => {
+    if (stages.length > 0) return;
+    const t = setTimeout(() => setWaking(true), 4000);
+    return () => clearTimeout(t);
+  }, [stages.length]);
+
   if (stages.length === 0) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Starting…
+        {waking ? "Waking the demo server (free tier, this can take up to a minute)…" : "Starting…"}
       </div>
     );
   }
