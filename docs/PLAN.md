@@ -19,7 +19,7 @@ comes next. Full spec: docs/SPEC.md.
 | 4 | Frontend core | **Complete** (/ask streams the trust pipeline; verified live + screenshots) |
 | 5 | Showcase pages | **Complete** (4 static pages from committed JSON; Vercel-ready; screenshots reviewed) |
 | 6 | Deploy (Vercel + Render) | **Complete** (repo deploy-ready + pushed; go-live via docs/DEPLOY.md) |
-| 7 | Usability + bring-your-own-data | **In progress** (A chart axes + B schema explorer first) |
+| 7 | Usability + bring-your-own-data | **In progress** (A,B done; C bring-your-own-data underway) |
 
 ---
 
@@ -612,8 +612,24 @@ gridlines, nice-rounded numeric scale), responsive + ARIA. Shared `niceTicks` he
 - Frontend: `lib/api.ts` `apiUrl()`; shadcn Sheet; `SchemaDrawer` ("Data" trigger on /ask) listing
   tables/columns/descriptions from `/schema`.
 
-### Parts C-H (later): BYO upload (CSV + .db, sessions, caps), cold-start warming + states, CSV
-download, shareable ?q= links, repo README, apiUrl reuse, mobile/a11y sweep.
+### Part C - bring-your-own-data (underway)
+- Dep `python-multipart`. `config.py`: UPLOAD_DIR, UPLOAD_MAX_CSV_MB (5), UPLOAD_MAX_DB_MB (20),
+  UPLOAD_MAX_ROWS (50k), UPLOAD_MAX_COLUMNS (60), SESSION_TTL_MINUTES (60), MAX_SESSIONS (50);
+  plus `semantic_enabled` (per-request flag).
+- `backend/app/datasets.py`: CSV -> stdlib `csv` stream into a one-table SQLite ("data") with
+  sniffed column types (no pandas); `.db` -> validate `SQLite format 3` header + size cap, save as
+  the session DB. In-memory session registry `{id: (path, created_at)}` + TTL sweep + count/disk caps.
+- `main.py`: `POST /upload` (rate-guarded) -> `{session, schema}`; `/ask`, `/ask/stream`, `/schema`
+  accept optional `session` -> resolve to the session DB via `dataclasses.replace(settings,
+  demo_db_path=..., semantic_enabled=False, calibration_path="")` (semantic layer off, uncalibrated).
+- `answer.py` `_contexts`: empty semantic context when `semantic_enabled` is False.
+- Tests `test_datasets.py` (CSV caps + type sniff, .db header validation, TTL/eviction) + session /ask.
+- Frontend: dataset switcher (Olist vs Upload) + drag/drop upload -> `/upload` -> store session, schema
+  drawer reflects it, "uncalibrated for custom data" banner, `session` in every /ask body.
+- Honors 4 GB (stdlib streaming, capped rows) and SELECT-only/read-only execution (unchanged backstop).
+
+### Parts D-H (later): cold-start warming + states, CSV download, shareable ?q= links, repo README,
+mobile/a11y sweep.
 
 **Gate results (A+B):** (2026-06-09) backend ruff + mypy (43 files) + 99 tests (new schema test) green,
 idle RSS 5.6 MB; frontend lint/tsc/build green; screenshots confirm bar/line charts now show x/y axes
